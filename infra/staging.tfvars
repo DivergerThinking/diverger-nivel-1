@@ -3,7 +3,7 @@
 # staging.gcs.tfbackend, para que su estado no pise el de otra).
 proyecto         = "diverger-exp-harness"
 region           = "europe-west1"
-aplicacion       = "golden-path"
+aplicacion       = "nivel-1"
 cuenta_ejecucion = "diverger-run@diverger-exp-harness.iam.gserviceaccount.com"
 
 # Despliegue continuo con Cloud Deploy (EN-FM-04): la cuenta y el almacén los crea gcp.sh del harness.
@@ -21,3 +21,9 @@ proteccion_borrado = false
 # añade su URL a los orígenes autorizados de JavaScript del cliente; sin ella, el botón de inicio de
 # sesión no funciona en el navegador (el validador no lo necesita).
 google_client_id = "856958240211-9odcnq6f4roe1er15rijo624ht8ekjmd.apps.googleusercontent.com"
+
+# Las cuentas de IT del nivel 1 (petición del nivel 1 del harness, EN-GP-07): la cuenta con la que entran
+# el validador y el inventario. Solo correos que pueden ser públicos: este repositorio lo es.
+variables_entorno = {
+  CORREOS_IT = "diverger-validacion@diverger-exp-harness.iam.gserviceaccount.com"
+}
