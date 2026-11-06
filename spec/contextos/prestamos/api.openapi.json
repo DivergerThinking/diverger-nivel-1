@@ -1,0 +1,306 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Préstamos",
+    "version": "1.0.0",
+    "description": "Estado de los equipos, solicitudes, entregas, préstamos en el mostrador, devoluciones, vencidos e historial. Rutas, campos, códigos y mensajes fijados por el cliente (ADR 0002)."
+  },
+  "servers": [{ "url": "/" }],
+  "security": [{ "google": [] }],
+  "paths": {
+    "/api/equipos": {
+      "get": {
+        "operationId": "prestamos.listarEquipos",
+        "summary": "Ver los equipos (todos)",
+        "responses": {
+          "200": {
+            "description": "Lista de equipos; si está reservado o prestado, también persona y devolucion",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/EquipoConEstado" } }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/SinSesion" }
+        }
+      }
+    },
+    "/api/equipos/{id}/solicitud": {
+      "post": {
+        "operationId": "prestamos.solicitarEquipo",
+        "summary": "Pedir un equipo (todos)",
+        "parameters": [{ "$ref": "#/components/parameters/IdEquipo" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Solicitud" },
+              "example": { "devolucion": "2026-11-20" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "El equipo: estado reservado, persona (el correo de quien lo pide) y devolucion",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EquipoConEstado" } } }
+          },
+          "400": {
+            "description": "Falta la fecha, no es una fecha real o ya ha pasado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "falta": { "value": { "error": "Falta la fecha de devolución" } },
+                  "noValida": { "value": { "error": "La fecha de devolución no es válida" } },
+                  "pasada": { "value": { "error": "La fecha de devolución ya ha pasado" } }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/SinSesion" },
+          "404": { "$ref": "#/components/responses/NoExiste" },
+          "409": { "$ref": "#/components/responses/NoDisponible" }
+        }
+      }
+    },
+    "/api/equipos/{id}/entrega": {
+      "post": {
+        "operationId": "prestamos.entregarEquipo",
+        "summary": "Entregar un equipo reservado (solo IT)",
+        "parameters": [{ "$ref": "#/components/parameters/IdEquipo" }],
+        "responses": {
+          "200": {
+            "description": "El equipo: estado prestado, con la misma persona y devolucion de la solicitud",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EquipoConEstado" } } }
+          },
+          "401": { "$ref": "#/components/responses/SinSesion" },
+          "403": { "$ref": "#/components/responses/SoloIT" },
+          "404": { "$ref": "#/components/responses/NoExiste" },
+          "409": {
+            "description": "El equipo no está reservado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "El equipo no está reservado" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/equipos/{id}/prestamo": {
+      "post": {
+        "operationId": "prestamos.prestarEquipo",
+        "summary": "Prestar en el mostrador (solo IT)",
+        "parameters": [{ "$ref": "#/components/parameters/IdEquipo" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PrestamoMostrador" },
+              "example": { "persona": "ana.perez@empresa.com", "devolucion": "2026-11-20" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "El equipo: estado prestado, persona y devolucion",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EquipoConEstado" } } }
+          },
+          "400": {
+            "description": "Faltan la persona o la fecha, o la fecha no es una fecha real",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "faltan": { "value": { "error": "Faltan la persona o la fecha de devolución" } },
+                  "noValida": { "value": { "error": "La fecha de devolución no es válida" } }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/SinSesion" },
+          "403": { "$ref": "#/components/responses/SoloIT" },
+          "404": { "$ref": "#/components/responses/NoExiste" },
+          "409": { "$ref": "#/components/responses/NoDisponible" }
+        }
+      }
+    },
+    "/api/equipos/{id}/devolucion": {
+      "post": {
+        "operationId": "prestamos.devolverEquipo",
+        "summary": "Apuntar la devolución (solo IT)",
+        "parameters": [{ "$ref": "#/components/parameters/IdEquipo" }],
+        "responses": {
+          "200": {
+            "description": "El equipo con estado disponible, sin persona ni devolucion",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EquipoConEstado" } } }
+          },
+          "401": { "$ref": "#/components/responses/SinSesion" },
+          "403": { "$ref": "#/components/responses/SoloIT" },
+          "404": { "$ref": "#/components/responses/NoExiste" },
+          "409": {
+            "description": "El equipo no está prestado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "El equipo no está prestado" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/prestamos/vencidos": {
+      "get": {
+        "operationId": "prestamos.listarVencidos",
+        "summary": "Ver los préstamos vencidos (solo IT)",
+        "responses": {
+          "200": {
+            "description": "Equipos prestados cuya fecha de devolución es anterior a hoy, del más antiguo al más reciente",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Vencido" } }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/SinSesion" },
+          "403": { "$ref": "#/components/responses/SoloIT" }
+        }
+      }
+    },
+    "/api/equipos/{id}/historial": {
+      "get": {
+        "operationId": "prestamos.obtenerHistorial",
+        "summary": "Ver el historial de un equipo (solo IT)",
+        "parameters": [{ "$ref": "#/components/parameters/IdEquipo" }],
+        "responses": {
+          "200": {
+            "description": "Sus préstamos, del más reciente al más antiguo",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/PrestamoHistorial" } }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/SinSesion" },
+          "403": { "$ref": "#/components/responses/SoloIT" },
+          "404": { "$ref": "#/components/responses/NoExiste" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "google": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Token de identidad de Google con el correo verificado, emitido para el cliente OAuth de la aplicación, de una persona o de una cuenta de servicio."
+      }
+    },
+    "parameters": {
+      "IdEquipo": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string" }
+      }
+    },
+    "responses": {
+      "SinSesion": {
+        "description": "Sin un token válido",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": { "error": "Inicia sesión con Google." }
+          }
+        }
+      },
+      "SoloIT": {
+        "description": "La cuenta no es de IT",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": { "error": "Solo IT puede hacer esto." }
+          }
+        }
+      },
+      "NoExiste": {
+        "description": "No existe el equipo",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": { "error": "No existe el equipo" }
+          }
+        }
+      },
+      "NoDisponible": {
+        "description": "El equipo está reservado o prestado",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": { "error": "El equipo no está disponible" }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Estado": {
+        "type": "string",
+        "enum": ["disponible", "reservado", "prestado"]
+      },
+      "Fecha": {
+        "type": "string",
+        "description": "Fecha AAAA-MM-DD que existe; se devuelve igual que se recibió.",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+      },
+      "EquipoConEstado": {
+        "type": "object",
+        "required": ["id", "nombre", "estado"],
+        "properties": {
+          "id": { "type": "string" },
+          "nombre": { "type": "string" },
+          "estado": { "$ref": "#/components/schemas/Estado" },
+          "persona": { "type": "string", "description": "Correo de quien lo tiene; solo si está reservado o prestado." },
+          "devolucion": { "$ref": "#/components/schemas/Fecha" }
+        }
+      },
+      "Solicitud": {
+        "type": "object",
+        "properties": { "devolucion": { "type": "string" } }
+      },
+      "PrestamoMostrador": {
+        "type": "object",
+        "properties": {
+          "persona": { "type": "string" },
+          "devolucion": { "type": "string" }
+        }
+      },
+      "Vencido": {
+        "type": "object",
+        "required": ["id", "nombre", "persona", "devolucion"],
+        "properties": {
+          "id": { "type": "string" },
+          "nombre": { "type": "string" },
+          "persona": { "type": "string" },
+          "devolucion": { "$ref": "#/components/schemas/Fecha" }
+        }
+      },
+      "PrestamoHistorial": {
+        "type": "object",
+        "required": ["persona", "devolucion", "estado"],
+        "properties": {
+          "persona": { "type": "string" },
+          "devolucion": { "$ref": "#/components/schemas/Fecha" },
+          "estado": { "type": "string", "enum": ["reservado", "prestado", "devuelto"] }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": { "error": { "type": "string" } }
+      }
+    }
+  }
+}
