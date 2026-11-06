@@ -1,5 +1,22 @@
 {
   "mode": "yolo",
   "default_provider": "local",
+  "conventions": {
+    "idScheme": "area",
+    "kinds": [
+      "story",
+      "enabler"
+    ],
+    "disciplines": [
+      "data",
+      "backend",
+      "frontend",
+      "qa"
+    ],
+    "estimation": "points+hours",
+    "priorityScale": "jira",
+    "requirementPrefix": "RQ.",
+    "sprintZero": true
+  },
   "maxCodeWorkers": 3
 }

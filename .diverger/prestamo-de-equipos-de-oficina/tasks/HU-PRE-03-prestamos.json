@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "HU-PRE-03-prestamos",
+  "title": "Préstamos: entregar un equipo reservado (HU-PRE-03)",
+  "status": "pending",
+  "story": "HU-PRE-03",
+  "context": "prestamos",
+  "modules": ["src/prestamos"],
+  "contracts": ["spec/contextos/prestamos/api.openapi.json"],
+  "dependsOn": ["HU-PRE-01-prestamos"]
+}
