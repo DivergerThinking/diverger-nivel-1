@@ -3,7 +3,7 @@ import type { FastifyPluginAsync } from "fastify";
 import "../../lib/auth.js";
 import type { OpcionesContexto } from "../../lib/datos.js";
 import type { components } from "./api.gen.js";
-import { listarEquipos, solicitarEquipo } from "./prestamos.js";
+import { listarEquipos, solicitarEquipo, validarDevolucion } from "./prestamos.js";
 
 export { type Equipo } from "./prestamos.js";
 
@@ -21,6 +21,9 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     if (typeof devolucion !== "string" || devolucion === "") {
       return reply.code(400).send({ error: "Falta la fecha de devolución" });
     }
+    const problema = validarDevolucion(devolucion);
+    if (problema === "no-valida") return reply.code(400).send({ error: "La fecha de devolución no es válida" });
+    if (problema === "pasada") return reply.code(400).send({ error: "La fecha de devolución ya ha pasado" });
     const resultado = await solicitarEquipo(almacen, request.params.id, request.persona.email, devolucion);
     if (resultado.ok) return reply.code(201).send(resultado.equipo);
     if (resultado.error === "no-existe") return reply.code(404).send({ error: "No existe el equipo" });

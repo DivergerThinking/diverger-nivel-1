@@ -2,10 +2,16 @@
   "schemaVersion": 1,
   "id": "HU-SOL-02-prestamos",
   "title": "Préstamos: validar la fecha de devolución de una solicitud (HU-SOL-02)",
-  "status": "pending",
+  "status": "done",
   "story": "HU-SOL-02",
   "context": "prestamos",
-  "modules": ["src/prestamos"],
-  "contracts": ["spec/contextos/prestamos/api.openapi.json"],
-  "dependsOn": ["HU-SOL-01-prestamos"]
+  "modules": [
+    "src/prestamos"
+  ],
+  "contracts": [
+    "spec/contextos/prestamos/api.openapi.json"
+  ],
+  "dependsOn": [
+    "HU-SOL-01-prestamos"
+  ]
 }

@@ -36,6 +36,28 @@ export interface DocumentoHistorial {
   creado: string;
 }
 
+/** El día de hoy en Madrid, como AAAA-MM-DD. */
+export function hoyEnMadrid(ahora: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Madrid",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(ahora);
+}
+
+/** Comprueba que `devolucion` es una fecha AAAA-MM-DD real y que no es anterior a hoy en Madrid. */
+export function validarDevolucion(devolucion: string, hoy: string = hoyEnMadrid()): "no-valida" | "pasada" | undefined {
+  const partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(devolucion);
+  if (partes === null) return "no-valida";
+  const [anio, mes, dia] = [Number(partes[1]), Number(partes[2]), Number(partes[3])];
+  const fecha = new Date(Date.UTC(anio, mes - 1, dia));
+  if (fecha.getUTCFullYear() !== anio || fecha.getUTCMonth() !== mes - 1 || fecha.getUTCDate() !== dia) {
+    return "no-valida";
+  }
+  return devolucion < hoy ? "pasada" : undefined;
+}
+
 export type ResultadoSolicitud = { ok: true; equipo: Equipo } | { ok: false; error: "no-existe" | "no-disponible" };
 
 /** Reserva un equipo disponible a nombre de la persona, en una transacción que escribe el préstamo y el historial. */
