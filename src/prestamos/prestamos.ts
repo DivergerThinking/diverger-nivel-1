@@ -164,6 +164,19 @@ export async function prestarEquipo(
   });
 }
 
+export type EntradaHistorial = components["schemas"]["EntradaHistorial"];
+
+/** Préstamos de un equipo, del más reciente al más antiguo; `undefined` si el equipo no existe. */
+export async function obtenerHistorial(almacen: Almacen, equipoId: string): Promise<EntradaHistorial[] | undefined> {
+  const equipo = await getEquipment(almacen, equipoId);
+  if (equipo === undefined) return undefined;
+  const prestamos = await almacen.listar<Prestamo>(HISTORIAL);
+  return prestamos
+    .filter((prestamo) => prestamo.equipoId === equipo.id)
+    .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn))
+    .map(({ persona, devolucion, estado }): EntradaHistorial => ({ persona, devolucion, estado }));
+}
+
 export type Vencido = components["schemas"]["Vencido"];
 
 /** Equipos prestados cuya devolución es anterior a `hoy`, del más antiguo al más reciente (a igual fecha, por nombre). */

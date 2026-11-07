@@ -3,7 +3,7 @@ import type { FastifyPluginAsync } from "fastify";
 import "../../lib/auth.js";
 import type { OpcionesContexto } from "../../lib/datos.js";
 import { isItAccount } from "../equipos/index.js";
-import { devolverEquipo, entregarEquipo, hoyEnMadrid, listarEquipos, listarVencidos, pedirEquipo, prestarEquipo } from "./prestamos.js";
+import { devolverEquipo, entregarEquipo, hoyEnMadrid, listarEquipos, listarVencidos, obtenerHistorial, pedirEquipo, prestarEquipo } from "./prestamos.js";
 
 /** Rutas del contrato spec/contextos/prestamos/api.openapi.json. */
 export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) => {
@@ -79,6 +79,14 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
       return reply.code(403).send({ error: "Solo IT puede hacer esto." });
     }
     return reply.code(200).send(await listarVencidos(almacen, hoyEnMadrid()));
+  });
+  app.get<{ Params: { id: string } }>("/api/equipos/:id/historial", async (request, reply) => {
+    if (!isItAccount(request.persona?.email ?? "")) {
+      return reply.code(403).send({ error: "Solo IT puede hacer esto." });
+    }
+    const historial = await obtenerHistorial(almacen, request.params.id);
+    if (historial === undefined) return reply.code(404).send({ error: "No existe el equipo" });
+    return reply.code(200).send(historial);
   });
   return Promise.resolve();
 };
