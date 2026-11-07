@@ -249,6 +249,139 @@ describe("POST /api/equipos/{id}/entrega", () => {
   });
 });
 
+describe("POST /api/equipos/{id}/prestamo", () => {
+  const IT = "it@empresa.com";
+  const ANA = "ana.perez@empresa.com";
+  let correosIT: string | undefined;
+
+  beforeEach(() => {
+    correosIT = process.env["CORREOS_IT"];
+    process.env["CORREOS_IT"] = IT;
+    // Solo se falsea Date, para que el servidor siga funcionando con los temporizadores reales.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-10T12:00:00+01:00"));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    if (correosIT === undefined) delete process.env["CORREOS_IT"];
+    else process.env["CORREOS_IT"] = correosIT;
+  });
+
+  async function prestar(id: string, cuerpo: object | undefined, correo?: string) {
+    const app = await servidor();
+    return app.inject({
+      method: "POST",
+      url: `/api/equipos/${id}/prestamo`,
+      headers: correo ? { "x-correo": correo } : {},
+      ...(cuerpo === undefined ? {} : { payload: cuerpo }),
+    });
+  }
+
+  it("presta un equipo disponible a la persona indicada", async () => {
+    await darDeAlta("e1", "Monitor 03");
+
+    const respuesta = await prestar("e1", { persona: ANA, devolucion: "2026-11-20" }, IT);
+
+    expect(respuesta.statusCode).toBe(201);
+    expect(respuesta.json()).toEqual({
+      id: "e1",
+      nombre: "Monitor 03",
+      estado: "prestado",
+      persona: ANA,
+      devolucion: "2026-11-20",
+    });
+    expect(await almacen.obtener("prestamos_activos", "e1")).toMatchObject({ persona: ANA, estado: "prestado" });
+    expect(await almacen.listar("prestamos_historial")).toMatchObject([
+      { equipoId: "e1", persona: ANA, devolucion: "2026-11-20", estado: "prestado" },
+    ]);
+  });
+
+  it("admite una fecha de devolución anterior a hoy", async () => {
+    await darDeAlta("e1", "Monitor 03");
+    const respuesta = await prestar("e1", { persona: ANA, devolucion: "2026-11-03" }, IT);
+    expect(respuesta.statusCode).toBe(201);
+    expect(respuesta.json()).toMatchObject({ estado: "prestado", devolucion: "2026-11-03" });
+  });
+
+  it("sin persona responde 400 y el equipo sigue disponible", async () => {
+    await darDeAlta("e1", "Monitor 03");
+    const respuesta = await prestar("e1", { devolucion: "2026-11-20" }, IT);
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: "Faltan la persona o la fecha de devolución" });
+    expect(await almacen.obtener("prestamos_activos", "e1")).toBeUndefined();
+  });
+
+  it("sin fecha responde 400 y el equipo sigue disponible", async () => {
+    await darDeAlta("e1", "Monitor 03");
+    const respuesta = await prestar("e1", { persona: ANA }, IT);
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: "Faltan la persona o la fecha de devolución" });
+    expect(await almacen.obtener("prestamos_activos", "e1")).toBeUndefined();
+  });
+
+  it("sin cuerpo responde 400", async () => {
+    await darDeAlta("e1", "Monitor 03");
+    const respuesta = await prestar("e1", undefined, IT);
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: "Faltan la persona o la fecha de devolución" });
+  });
+
+  it("una fecha inexistente responde 400 y el equipo sigue disponible", async () => {
+    await darDeAlta("e1", "Monitor 03");
+    const respuesta = await prestar("e1", { persona: ANA, devolucion: "2026-02-30" }, IT);
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: "La fecha de devolución no es válida" });
+    expect(await almacen.obtener("prestamos_activos", "e1")).toBeUndefined();
+  });
+
+  it("un equipo que no existe responde 404", async () => {
+    const respuesta = await prestar("no-existe", { persona: ANA, devolucion: "2026-11-20" }, IT);
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("un equipo reservado responde 409 y la reserva no cambia", async () => {
+    await darDeAlta("e1", "Monitor 03");
+    await reservar("e1", "luis.gomez@empresa.com", "2026-11-15");
+
+    const respuesta = await prestar("e1", { persona: ANA, devolucion: "2026-11-20" }, IT);
+
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está disponible" });
+    expect(await almacen.obtener("prestamos_activos", "e1")).toMatchObject({
+      persona: "luis.gomez@empresa.com",
+      estado: "reservado",
+    });
+    expect(await almacen.listar("prestamos_historial")).toHaveLength(0);
+  });
+
+  it("con una solicitud y un préstamo simultáneos una sale bien y la otra recibe 409", async () => {
+    await darDeAlta("e1", "Monitor 03");
+    const [a, b] = await Promise.all([
+      solicitar("e1", { devolucion: "2026-11-20" }, ANA),
+      prestar("e1", { persona: "luis.gomez@empresa.com", devolucion: "2026-11-20" }, IT),
+    ]);
+    expect([a.statusCode, b.statusCode].sort()).toEqual([201, 409]);
+    expect(await almacen.listar("prestamos_activos")).toHaveLength(1);
+  });
+
+  it("una cuenta que no es de IT responde 403 y el equipo sigue disponible", async () => {
+    await darDeAlta("e1", "Monitor 03");
+    const respuesta = await prestar("e1", { persona: ANA, devolucion: "2026-11-20" }, ANA);
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+    expect(await almacen.obtener("prestamos_activos", "e1")).toBeUndefined();
+  });
+
+  it("sin sesión responde 401", async () => {
+    await darDeAlta("e1", "Monitor 03");
+    const respuesta = await prestar("e1", { persona: ANA, devolucion: "2026-11-20" });
+    expect(respuesta.statusCode).toBe(401);
+    expect(respuesta.json()).toEqual({ error: "Inicia sesión con Google." });
+    expect(await almacen.obtener("prestamos_activos", "e1")).toBeUndefined();
+  });
+});
+
 describe("fecha de devolución de la solicitud", () => {
   beforeEach(() => {
     // Solo se falsea Date, para que el servidor siga funcionando con los temporizadores reales.
