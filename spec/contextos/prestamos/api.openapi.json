@@ -5,6 +5,8 @@
     "version": "1.0.0",
     "description": "Solicitudes, entregas, préstamos en el mostrador, devoluciones, vencidos e historial. Rutas, campos, códigos y mensajes de la API fijada por el cliente (ADR 0001)."
   },
+  "servers": [{ "url": "/" }],
+  "security": [{ "google": [] }],
   "paths": {
     "/api/equipos": {
       "get": {
@@ -197,6 +199,9 @@
     }
   },
   "components": {
+    "securitySchemes": {
+      "google": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "Token de identidad de Google con el correo verificado, emitido para el cliente OAuth de la aplicación" }
+    },
     "parameters": {
       "IdEquipo": {
         "name": "id",
