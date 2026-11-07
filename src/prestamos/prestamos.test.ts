@@ -559,6 +559,88 @@ describe("fecha de devolución de la solicitud", () => {
   });
 });
 
+describe("GET /api/prestamos/vencidos", () => {
+  const IT = "it@empresa.com";
+  let correosIT: string | undefined;
+
+  beforeEach(() => {
+    correosIT = process.env["CORREOS_IT"];
+    process.env["CORREOS_IT"] = IT;
+    // Solo se falsea Date, para que el servidor siga funcionando con los temporizadores reales.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-10T12:00:00+01:00"));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    if (correosIT === undefined) delete process.env["CORREOS_IT"];
+    else process.env["CORREOS_IT"] = correosIT;
+  });
+
+  async function prestarA(id: string, nombre: string, devolucion: string, estado: "prestado" | "reservado" = "prestado") {
+    await darDeAlta(id, nombre);
+    await almacen.guardar("prestamos_activos", id, { equipoId: id, persona: "ana.perez@empresa.com", devolucion, estado });
+  }
+
+  async function vencidos(correo?: string) {
+    const app = await servidor();
+    return app.inject({ method: "GET", url: "/api/prestamos/vencidos", headers: correo ? { "x-correo": correo } : {} });
+  }
+
+  async function dejarPrestamos() {
+    await prestarA("e1", "Portátil 07", "2026-11-08");
+    await prestarA("e2", "Monitor 03", "2026-11-05");
+    await prestarA("e3", "Proyector 01", "2026-11-10");
+    await prestarA("e4", "Portátil 08", "2026-11-20");
+  }
+
+  it("lista los vencidos del más antiguo al más reciente, sin los que vencen hoy ni después", async () => {
+    await dejarPrestamos();
+
+    const respuesta = await vencidos(IT);
+
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual([
+      { id: "e2", nombre: "Monitor 03", persona: "ana.perez@empresa.com", devolucion: "2026-11-05" },
+      { id: "e1", nombre: "Portátil 07", persona: "ana.perez@empresa.com", devolucion: "2026-11-08" },
+    ]);
+  });
+
+  it("usa el día de Madrid para decidir qué ha vencido", async () => {
+    vi.setSystemTime(new Date("2026-11-09T23:30:00Z"));
+    await prestarA("e1", "Portátil 07", "2026-11-09");
+    await prestarA("e2", "Monitor 03", "2026-11-10");
+    const respuesta = await vencidos(IT);
+    expect(respuesta.json()).toMatchObject([{ id: "e1" }]);
+  });
+
+  it("no incluye los equipos reservados aunque su fecha haya pasado", async () => {
+    await prestarA("e1", "Portátil 07", "2026-11-08", "reservado");
+    const respuesta = await vencidos(IT);
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual([]);
+  });
+
+  it("sin préstamos vencidos responde 200 con una lista vacía", async () => {
+    const respuesta = await vencidos(IT);
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual([]);
+  });
+
+  it("una cuenta que no es de IT responde 403", async () => {
+    await dejarPrestamos();
+    const respuesta = await vencidos("ana.perez@empresa.com");
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+  });
+
+  it("sin sesión responde 401", async () => {
+    await dejarPrestamos();
+    const respuesta = await vencidos();
+    expect(respuesta.statusCode).toBe(401);
+    expect(respuesta.json()).toEqual({ error: "Inicia sesión con Google." });
+  });
+});
+
 describe("hoyEnMadrid", () => {
   it("usa el día de Madrid, no el de UTC", () => {
     expect(hoyEnMadrid(new Date("2026-11-09T23:30:00Z"))).toBe("2026-11-10");
