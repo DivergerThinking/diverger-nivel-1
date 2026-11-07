@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Fastify, { type FastifyInstance } from "fastify";
 import { tokenDeCabecera } from "../../lib/auth.js";
 import { almacenEnMemoria, type Almacen } from "../../lib/datos.js";
@@ -8,6 +8,7 @@ import type { Prestamo, PrestamoActivo } from "./prestamos.js";
 const PERSONAS: Record<string, { email: string; nombre: string }> = {
   it: { email: "it.soporte@empresa.com", nombre: "IT" },
   luis: { email: "luis.gomez@empresa.com", nombre: "Luis" },
+  ana: { email: "ana.perez@empresa.com", nombre: "Ana" },
 };
 const verificarToken = (token: string) => Promise.resolve(PERSONAS[token] ?? null);
 
@@ -133,8 +134,58 @@ describe("POST /api/equipos/{id}/prestamo", () => {
     expect(await almacen.listar("prestamos_historial")).toHaveLength(1);
   });
 
+  describe("peticiones simultáneas de solicitud y préstamo", () => {
+    const solicitar = (id: string, token: string) =>
+      app.inject({
+        method: "POST",
+        url: `/api/equipos/${id}/solicitud`,
+        headers: { authorization: `Bearer ${token}` },
+        payload: { devolucion: "2026-11-20" },
+      });
+    const listar = () => app.inject({ method: "GET", url: "/api/equipos", headers: { authorization: "Bearer luis" } });
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-10T09:00:00+01:00"));
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("dos empleados piden a la vez el mismo equipo: uno lo reserva a su correo y el otro recibe 409", async () => {
+      const portatil = await equipo("Portátil 07");
+      const respuestas = await Promise.all([solicitar(portatil, "luis"), solicitar(portatil, "ana")]);
+      const ganadora = respuestas.find((respuesta) => respuesta.statusCode === 201);
+      const perdedora = respuestas.find((respuesta) => respuesta.statusCode === 409);
+      expect(ganadora).toBeDefined();
+      expect(perdedora?.json()).toEqual({ error: "El equipo no está disponible" });
+      const reservado = ganadora?.json<{ estado: string; persona: string }>();
+      expect(reservado?.estado).toBe("reservado");
+      expect(["luis.gomez@empresa.com", "ana.perez@empresa.com"]).toContain(reservado?.persona);
+      const equipos = (await listar()).json<{ nombre: string; persona?: string }[]>();
+      expect(equipos).toEqual([expect.objectContaining({ nombre: "Portátil 07", persona: reservado?.persona })]);
+    });
+
+    it.each([
+      ["la solicitud primero", true],
+      ["el préstamo primero", false],
+    ])("una solicitud y un préstamo en el mismo instante (%s): uno sale bien, el otro recibe 409 y el equipo tiene una sola persona", async (_caso, solicitudPrimero) => {
+      const portatil = await equipo("Portátil 07");
+      const pedirSolicitud = () => solicitar(portatil, "luis");
+      const pedirPrestamo = () => prestar(portatil, { persona: "ana.perez@empresa.com", devolucion: "2026-11-20" });
+      const respuestas = await Promise.all(solicitudPrimero ? [pedirSolicitud(), pedirPrestamo()] : [pedirPrestamo(), pedirSolicitud()]);
+      expect(respuestas.map((respuesta) => respuesta.statusCode).sort()).toEqual([201, 409]);
+      expect(respuestas.find((respuesta) => respuesta.statusCode === 409)?.json()).toEqual({ error: "El equipo no está disponible" });
+      const equipos = (await listar()).json<{ nombre: string; persona?: string }[]>();
+      expect(equipos).toHaveLength(1);
+      expect(equipos[0]).toMatchObject({ nombre: "Portátil 07" });
+      expect(typeof equipos[0]?.persona).toBe("string");
+      expect(await almacen.listar("prestamos_historial")).toHaveLength(1);
+    });
+  });
+
   it("responde 404 si el equipo no existe", async () => {
-    const respuesta = await prestar("no-existe", { persona: "ana.perez@empresa.com", devolucion: "2026-11-20" });
+    const respuesta = await prestar("no-existe",{ persona: "ana.perez@empresa.com", devolucion: "2026-11-20" });
     expect(respuesta.statusCode).toBe(404);
     expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
   });
