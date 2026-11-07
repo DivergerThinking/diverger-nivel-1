@@ -6,6 +6,7 @@ import { exigirIt } from "../equipos/index.js";
 import { devolverEquipo } from "./devolucion.js";
 import { entregarEquipo } from "./entrega.js";
 import { listarEquiposConEstado } from "./estados.js";
+import { obtenerHistorial } from "./historial.js";
 import { prestarEquipo } from "./mostrador.js";
 import { solicitarEquipo } from "./solicitud.js";
 import { listarVencidos } from "./vencidos.js";
@@ -39,5 +40,10 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     return reply.code(200).send(resultado.equipo);
   });
   app.get("/api/prestamos/vencidos", { preHandler: exigirIt }, async () => listarVencidos(almacen, new Date()));
+  app.get<{ Params: { id: string } }>("/api/equipos/:id/historial", { preHandler: exigirIt }, async (request, reply) => {
+    const resultado = await obtenerHistorial(almacen, request.params.id);
+    if (!resultado.ok) return reply.code(resultado.codigo).send({ error: resultado.error });
+    return reply.code(200).send(resultado.historial);
+  });
   return Promise.resolve();
 };
