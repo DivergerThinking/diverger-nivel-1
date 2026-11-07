@@ -1,8 +1,9 @@
 import Fastify from "fastify";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "../../lib/auth.js";
 import { almacenEnMemoria, type Almacen } from "../../lib/datos.js";
 import { rutas } from "./index.js";
+import { hoyEnMadrid } from "./prestamos.js";
 
 let almacen: Almacen;
 
@@ -135,6 +136,63 @@ describe("POST /api/equipos/{id}/solicitud", () => {
     expect(respuesta.statusCode).toBe(401);
     expect(respuesta.json()).toEqual({ error: "Inicia sesión con Google." });
     expect(await almacen.obtener("prestamos_activos", "e1")).toBeUndefined();
+  });
+});
+
+describe("fecha de devolución de la solicitud", () => {
+  beforeEach(() => {
+    // Solo se falsea Date, para que el servidor siga funcionando con los temporizadores reales.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-10T12:00:00+01:00"));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("la fecha de hoy reserva el equipo", async () => {
+    await darDeAlta("e1", "Portátil 07");
+    const respuesta = await solicitar("e1", { devolucion: "2026-11-10" }, "ana.perez@empresa.com");
+    expect(respuesta.statusCode).toBe(201);
+    expect(respuesta.json()).toMatchObject({ estado: "reservado", devolucion: "2026-11-10" });
+  });
+
+  it("una fecha pasada responde 400 y el equipo sigue disponible", async () => {
+    await darDeAlta("e1", "Portátil 07");
+    const respuesta = await solicitar("e1", { devolucion: "2026-11-09" }, "ana.perez@empresa.com");
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: "La fecha de devolución ya ha pasado" });
+    expect(await almacen.obtener("prestamos_activos", "e1")).toBeUndefined();
+    expect(await almacen.listar("prestamos_historial")).toHaveLength(0);
+  });
+
+  it("una fecha inexistente responde 400 y el equipo sigue disponible", async () => {
+    await darDeAlta("e1", "Portátil 07");
+    const respuesta = await solicitar("e1", { devolucion: "2026-02-30" }, "ana.perez@empresa.com");
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: "La fecha de devolución no es válida" });
+    expect(await almacen.obtener("prestamos_activos", "e1")).toBeUndefined();
+  });
+
+  it("un texto que no es AAAA-MM-DD responde 400", async () => {
+    await darDeAlta("e1", "Portátil 07");
+    const respuesta = await solicitar("e1", { devolucion: "mañana" }, "ana.perez@empresa.com");
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: "La fecha de devolución no es válida" });
+  });
+
+  it("sin fecha responde 400 y el equipo sigue disponible", async () => {
+    await darDeAlta("e1", "Portátil 07");
+    const respuesta = await solicitar("e1", {}, "ana.perez@empresa.com");
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: "Falta la fecha de devolución" });
+    expect(await almacen.obtener("prestamos_activos", "e1")).toBeUndefined();
+  });
+});
+
+describe("hoyEnMadrid", () => {
+  it("usa el día de Madrid, no el de UTC", () => {
+    expect(hoyEnMadrid(new Date("2026-11-09T23:30:00Z"))).toBe("2026-11-10");
+    expect(hoyEnMadrid(new Date("2026-07-09T22:30:00Z"))).toBe("2026-07-10");
   });
 });
 
