@@ -62,12 +62,16 @@ export function validarDevolucion(devolucion: string, hoy: string = hoyEnMadrid(
 
 export type ResultadoSolicitud = { ok: true; equipo: Equipo } | { ok: false; error: "no-existe" | "no-disponible" };
 
-/** Reserva un equipo disponible a nombre de la persona, en una transacción que escribe el préstamo y el historial. */
+/**
+ * Deja un equipo disponible a nombre de la persona, en una transacción que escribe el préstamo y el historial:
+ * `reservado` en una solicitud, `prestado` en un préstamo en el mostrador.
+ */
 export async function solicitarEquipo(
   almacen: Almacen,
   id: string,
   persona: string,
   devolucion: string,
+  estado: "reservado" | "prestado" = "reservado",
 ): Promise<ResultadoSolicitud> {
   return almacen.transaccion<ResultadoSolicitud>(async (tx) => {
     const documento = await tx.obtener<DocumentoEquipo>("equipos", id);
@@ -75,12 +79,12 @@ export async function solicitarEquipo(
     const activo = await tx.obtener<DocumentoPrestamoActivo>("prestamos_activos", id);
     if (activo !== undefined) return { ok: false, error: "no-disponible" };
     const historialId = randomUUID();
-    const nuevo: DocumentoPrestamoActivo = { equipoId: id, persona, devolucion, estado: "reservado", historialId };
+    const nuevo: DocumentoPrestamoActivo = { equipoId: id, persona, devolucion, estado, historialId };
     const entrada: DocumentoHistorial = {
       equipoId: id,
       persona,
       devolucion,
-      estado: "reservado",
+      estado,
       creado: new Date().toISOString(),
     };
     tx.guardar("prestamos_activos", id, nuevo);
