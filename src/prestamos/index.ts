@@ -3,7 +3,7 @@ import type { FastifyPluginAsync } from "fastify";
 import "../../lib/auth.js";
 import type { OpcionesContexto } from "../../lib/datos.js";
 import { isItAccount } from "../equipos/index.js";
-import { entregarEquipo, hoyEnMadrid, listarEquipos, pedirEquipo } from "./prestamos.js";
+import { entregarEquipo, hoyEnMadrid, listarEquipos, pedirEquipo, prestarEquipo } from "./prestamos.js";
 
 /** Rutas del contrato spec/contextos/prestamos/api.openapi.json. */
 export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) => {
@@ -39,6 +39,25 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
         return reply.code(409).send({ error: "El equipo no está reservado" });
       case "prestado":
         return reply.code(200).send(resultado.equipo);
+    }
+  });
+  app.post<{ Params: { id: string } }>("/api/equipos/:id/prestamo", async (request, reply) => {
+    if (!isItAccount(request.persona?.email ?? "")) {
+      return reply.code(403).send({ error: "Solo IT puede hacer esto." });
+    }
+    const cuerpo = typeof request.body === "object" && request.body !== null ? (request.body as { persona?: unknown; devolucion?: unknown }) : {};
+    const resultado = await prestarEquipo(almacen, request.params.id, cuerpo.persona, cuerpo.devolucion);
+    switch (resultado.tipo) {
+      case "faltan-datos":
+        return reply.code(400).send({ error: "Faltan la persona o la fecha de devolución" });
+      case "fecha-no-valida":
+        return reply.code(400).send({ error: "La fecha de devolución no es válida" });
+      case "no-existe":
+        return reply.code(404).send({ error: "No existe el equipo" });
+      case "no-disponible":
+        return reply.code(409).send({ error: "El equipo no está disponible" });
+      case "prestado":
+        return reply.code(201).send(resultado.equipo);
     }
   });
   return Promise.resolve();
