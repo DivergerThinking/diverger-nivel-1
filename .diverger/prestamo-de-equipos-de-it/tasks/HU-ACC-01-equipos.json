@@ -2,10 +2,19 @@
   "schemaVersion": 1,
   "id": "HU-ACC-01-equipos",
   "title": "Equipos: entrar con la cuenta de Google de la empresa (HU-ACC-01)",
-  "status": "pending",
+  "status": "done",
   "story": "HU-ACC-01",
   "context": "equipos",
-  "modules": ["src/equipos"],
-  "contracts": ["spec/contextos/equipos/api.openapi.json"],
-  "dependsOn": ["HU-GES-01-equipos"]
+  "modules": [
+    "src/equipos"
+  ],
+  "contracts": [
+    "spec/contextos/equipos/api.openapi.json"
+  ],
+  "dependsOn": [
+    "HU-GES-01-equipos"
+  ],
+  "failures": [
+    "el `afterEach` cerraba una instancia de Fastify que los tests de `verificadorGoogle` nunca crean, y `app.close()` fallaba en esos 5 tests."
+  ]
 }
