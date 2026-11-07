@@ -160,6 +160,17 @@ export async function listarVencidos(almacen: Almacen, hoy: string = hoyEnMadrid
   return vencidos.sort((a, b) => a.devolucion.localeCompare(b.devolucion) || a.nombre.localeCompare(b.nombre, "es"));
 }
 
+export type EntradaHistorial = components["schemas"]["EntradaHistorial"];
+
+/** El historial de préstamos de un equipo, del más reciente al más antiguo; `undefined` si el equipo no existe. */
+export async function consultarHistorial(almacen: Almacen, id: string): Promise<EntradaHistorial[] | undefined> {
+  if ((await almacen.obtener<DocumentoEquipo>("equipos", id)) === undefined) return undefined;
+  const entradas = (await almacen.listar<DocumentoHistorial>("prestamos_historial")).filter((entrada) => entrada.equipoId === id);
+  return entradas
+    .sort((a, b) => b.creado.localeCompare(a.creado))
+    .map(({ persona, devolucion, estado }) => ({ persona, devolucion, estado }));
+}
+
 /** Los equipos del catálogo con su estado, ordenados por nombre. */
 export async function listarEquipos(almacen: Almacen): Promise<Equipo[]> {
   const nombres = await almacen.listar<DocumentoNombre>("equipos_nombres");

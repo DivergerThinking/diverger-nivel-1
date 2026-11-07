@@ -641,6 +641,100 @@ describe("GET /api/prestamos/vencidos", () => {
   });
 });
 
+describe("GET /api/equipos/{id}/historial", () => {
+  const IT = "it@empresa.com";
+  const ANA = "ana.perez@empresa.com";
+  const LUIS = "luis.gomez@empresa.com";
+  let correosIT: string | undefined;
+
+  beforeEach(() => {
+    correosIT = process.env["CORREOS_IT"];
+    process.env["CORREOS_IT"] = IT;
+  });
+  afterEach(() => {
+    if (correosIT === undefined) delete process.env["CORREOS_IT"];
+    else process.env["CORREOS_IT"] = correosIT;
+  });
+
+  async function historial(id: string, correo?: string) {
+    const app = await servidor();
+    return app.inject({ method: "GET", url: `/api/equipos/${id}/historial`, headers: correo ? { "x-correo": correo } : {} });
+  }
+
+  async function entrada(equipoId: string, persona: string, devolucion: string, estado: string, creado: string) {
+    await almacen.guardar("prestamos_historial", `${equipoId}-${creado}`, { equipoId, persona, devolucion, estado, creado });
+  }
+
+  it("lista los préstamos del equipo del más reciente al más antiguo", async () => {
+    await darDeAlta("e1", "Portátil 07");
+    await entrada("e1", LUIS, "2026-11-05", "devuelto", "2026-11-01T09:00:00.000Z");
+    await entrada("e1", ANA, "2026-11-20", "reservado", "2026-11-06T09:00:00.000Z");
+
+    const respuesta = await historial("e1", IT);
+
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual([
+      { persona: ANA, devolucion: "2026-11-20", estado: "reservado" },
+      { persona: LUIS, devolucion: "2026-11-05", estado: "devuelto" },
+    ]);
+  });
+
+  it("recorre el ciclo completo: devuelto y después reservado", async () => {
+    await darDeAlta("e1", "Portátil 07");
+    const app = await servidor();
+    const post = (url: string, payload?: object) =>
+      app.inject({ method: "POST", url, headers: { "x-correo": IT }, ...(payload === undefined ? {} : { payload }) });
+    await post("/api/equipos/e1/prestamo", { persona: LUIS, devolucion: "2026-11-05" });
+    await post("/api/equipos/e1/devolucion");
+    await new Promise((resolver) => setTimeout(resolver, 5));
+    await solicitar("e1", { devolucion: "2026-11-20" }, ANA);
+
+    const respuesta = await historial("e1", IT);
+
+    expect(respuesta.json()).toEqual([
+      { persona: ANA, devolucion: "2026-11-20", estado: "reservado" },
+      { persona: LUIS, devolucion: "2026-11-05", estado: "devuelto" },
+    ]);
+  });
+
+  it("no incluye los préstamos de otros equipos", async () => {
+    await darDeAlta("e1", "Portátil 07");
+    await darDeAlta("e2", "Monitor 03");
+    await entrada("e1", ANA, "2026-11-20", "prestado", "2026-11-06T09:00:00.000Z");
+    await entrada("e2", LUIS, "2026-11-05", "devuelto", "2026-11-01T09:00:00.000Z");
+    const respuesta = await historial("e1", IT);
+    expect(respuesta.json()).toEqual([{ persona: ANA, devolucion: "2026-11-20", estado: "prestado" }]);
+  });
+
+  it("un equipo sin préstamos responde 200 con una lista vacía", async () => {
+    await darDeAlta("e1", "Portátil 07");
+    const respuesta = await historial("e1", IT);
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual([]);
+  });
+
+  it("un equipo que no existe responde 404", async () => {
+    const respuesta = await historial("no-existe", IT);
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("una cuenta que no es de IT responde 403", async () => {
+    await darDeAlta("e1", "Portátil 07");
+    await entrada("e1", ANA, "2026-11-20", "reservado", "2026-11-06T09:00:00.000Z");
+    const respuesta = await historial("e1", ANA);
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+  });
+
+  it("sin sesión responde 401", async () => {
+    await darDeAlta("e1", "Portátil 07");
+    const respuesta = await historial("e1");
+    expect(respuesta.statusCode).toBe(401);
+    expect(respuesta.json()).toEqual({ error: "Inicia sesión con Google." });
+  });
+});
+
 describe("hoyEnMadrid", () => {
   it("usa el día de Madrid, no el de UTC", () => {
     expect(hoyEnMadrid(new Date("2026-11-09T23:30:00Z"))).toBe("2026-11-10");
