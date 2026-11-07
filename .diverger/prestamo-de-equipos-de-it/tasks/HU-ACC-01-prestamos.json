@@ -2,10 +2,16 @@
   "schemaVersion": 1,
   "id": "HU-ACC-01-prestamos",
   "title": "Préstamos: entrar con la cuenta de Google de la empresa (HU-ACC-01)",
-  "status": "pending",
+  "status": "done",
   "story": "HU-ACC-01",
   "context": "prestamos",
-  "modules": ["src/prestamos"],
-  "contracts": ["spec/contextos/prestamos/api.openapi.json"],
-  "dependsOn": ["HU-SEG-02-prestamos"]
+  "modules": [
+    "src/prestamos"
+  ],
+  "contracts": [
+    "spec/contextos/prestamos/api.openapi.json"
+  ],
+  "dependsOn": [
+    "HU-SEG-02-prestamos"
+  ]
 }
