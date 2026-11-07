@@ -267,6 +267,112 @@ describe("POST /api/equipos/{id}/entrega", () => {
   });
 });
 
+describe("POST /api/equipos/{id}/devolucion", () => {
+  const IT = "it@empresa.com";
+  let correosIT: string | undefined;
+
+  beforeEach(() => {
+    correosIT = process.env["CORREOS_IT"];
+    process.env["CORREOS_IT"] = IT;
+  });
+  afterEach(() => {
+    if (correosIT === undefined) delete process.env["CORREOS_IT"];
+    else process.env["CORREOS_IT"] = correosIT;
+  });
+
+  async function post(url: string, correo?: string) {
+    const app = await servidor();
+    return app.inject({ method: "POST", url, headers: correo ? { "x-correo": correo } : {} });
+  }
+  const devolver = (id: string, correo?: string) => post(`/api/equipos/${id}/devolucion`, correo);
+
+  async function prestado() {
+    await darDeAlta("e1", "Portátil 07");
+    await solicitar("e1", { devolucion: "2026-11-20" }, "ana.perez@empresa.com");
+    await post("/api/equipos/e1/entrega", IT);
+  }
+
+  it("deja el equipo disponible, sin persona ni devolución", async () => {
+    await prestado();
+
+    const respuesta = await devolver("e1", IT);
+
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual({ id: "e1", nombre: "Portátil 07", estado: "disponible" });
+    expect(await almacen.obtener("prestamos_activos", "e1")).toBeUndefined();
+    const [equipo] = (await listar("luis.gomez@empresa.com")).json<Record<string, unknown>[]>();
+    expect(equipo).toEqual({ id: "e1", nombre: "Portátil 07", estado: "disponible" });
+  });
+
+  it("pasa la entrada del historial a devuelto, sin añadir otra", async () => {
+    await prestado();
+    const [antes] = await almacen.listar<{ creado: string }>("prestamos_historial");
+
+    await devolver("e1", IT);
+
+    expect(await almacen.listar("prestamos_historial")).toEqual([
+      {
+        equipoId: "e1",
+        persona: "ana.perez@empresa.com",
+        devolucion: "2026-11-20",
+        estado: "devuelto",
+        creado: antes?.creado,
+      },
+    ]);
+  });
+
+  it("un préstamo sin id de historial deja una entrada nueva", async () => {
+    await darDeAlta("e1", "Portátil 07");
+    await almacen.guardar("prestamos_activos", "e1", {
+      equipoId: "e1",
+      persona: "ana.perez@empresa.com",
+      devolucion: "2026-11-20",
+      estado: "prestado",
+    });
+    const respuesta = await devolver("e1", IT);
+    expect(respuesta.statusCode).toBe(200);
+    expect(await almacen.listar("prestamos_historial")).toMatchObject([{ estado: "devuelto" }]);
+  });
+
+  it("un equipo reservado responde 409 y la reserva se mantiene", async () => {
+    await darDeAlta("e1", "Portátil 07");
+    await reservar("e1", "ana.perez@empresa.com", "2026-11-20");
+    const respuesta = await devolver("e1", IT);
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está prestado" });
+    expect(await almacen.obtener("prestamos_activos", "e1")).toMatchObject({ estado: "reservado" });
+  });
+
+  it("un equipo disponible responde 409", async () => {
+    await darDeAlta("e1", "Portátil 07");
+    const respuesta = await devolver("e1", IT);
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está prestado" });
+  });
+
+  it("un equipo que no existe responde 404", async () => {
+    const respuesta = await devolver("no-existe", IT);
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("una cuenta que no es de IT responde 403 y el equipo sigue prestado", async () => {
+    await prestado();
+    const respuesta = await devolver("e1", "ana.perez@empresa.com");
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+    expect(await almacen.obtener("prestamos_activos", "e1")).toMatchObject({ estado: "prestado" });
+  });
+
+  it("sin sesión responde 401", async () => {
+    await prestado();
+    const respuesta = await devolver("e1");
+    expect(respuesta.statusCode).toBe(401);
+    expect(respuesta.json()).toEqual({ error: "Inicia sesión con Google." });
+    expect(await almacen.obtener("prestamos_activos", "e1")).toMatchObject({ estado: "prestado" });
+  });
+});
+
 describe("POST /api/equipos/{id}/prestamo", () => {
   const IT = "it@empresa.com";
   const ANA = "ana.perez@empresa.com";

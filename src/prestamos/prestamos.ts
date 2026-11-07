@@ -120,6 +120,31 @@ export async function entregarEquipo(almacen: Almacen, id: string): Promise<Resu
   });
 }
 
+export type ResultadoDevolucion = { ok: true; equipo: Equipo } | { ok: false; error: "no-existe" | "no-prestado" };
+
+/** Apunta la devolución de un equipo prestado: lo deja disponible y pasa su entrada del historial a «devuelto». */
+export async function devolverEquipo(almacen: Almacen, id: string): Promise<ResultadoDevolucion> {
+  return almacen.transaccion<ResultadoDevolucion>(async (tx) => {
+    const documento = await tx.obtener<DocumentoEquipo>("equipos", id);
+    if (documento === undefined) return { ok: false, error: "no-existe" };
+    const activo = await tx.obtener<DocumentoPrestamoActivo>("prestamos_activos", id);
+    if (activo?.estado !== "prestado") return { ok: false, error: "no-prestado" };
+    // Primero las lecturas y después las escrituras; sin id de historial (anterior a este campo) se deja una entrada nueva.
+    const historialId = activo.historialId ?? randomUUID();
+    const anterior = activo.historialId === undefined ? undefined : await tx.obtener<DocumentoHistorial>("prestamos_historial", historialId);
+    tx.borrar("prestamos_activos", id);
+    const entrada: DocumentoHistorial = {
+      equipoId: id,
+      persona: activo.persona,
+      devolucion: activo.devolucion,
+      estado: "devuelto",
+      creado: anterior?.creado ?? new Date().toISOString(),
+    };
+    tx.guardar("prestamos_historial", historialId, entrada);
+    return { ok: true, equipo: equipoConEstado(id, documento.nombre, undefined) };
+  });
+}
+
 /** Los equipos del catálogo con su estado, ordenados por nombre. */
 export async function listarEquipos(almacen: Almacen): Promise<Equipo[]> {
   const nombres = await almacen.listar<DocumentoNombre>("equipos_nombres");
