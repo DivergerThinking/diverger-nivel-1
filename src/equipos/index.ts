@@ -7,6 +7,8 @@ import { exigirIt } from "./cuentas-it.js";
 import { darDeAltaEquipo } from "./equipos.js";
 
 export { esCuentaIt, exigirIt, MENSAJE_SOLO_IT } from "./cuentas-it.js";
+export { listarEquipos } from "./equipos.js";
+export type { Equipo } from "./equipos.js";
 
 /**
  * Rutas del contrato spec/contextos/equipos/api.openapi.json.

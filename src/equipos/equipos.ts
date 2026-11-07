@@ -28,6 +28,12 @@ function claveDeNombre(normalizado: string): string {
   return createHash("sha256").update(normalizado).digest("hex");
 }
 
+/** Todos los equipos dados de alta, por nombre. */
+export async function listarEquipos(almacen: Almacen): Promise<Equipo[]> {
+  const equipos = await almacen.listar<Equipo>(COLECCION_EQUIPOS);
+  return equipos.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+}
+
 export async function darDeAltaEquipo(almacen: Almacen, cuerpo: unknown): Promise<ResultadoAlta> {
   const bruto = typeof cuerpo === "object" && cuerpo !== null ? (cuerpo as { nombre?: unknown }).nombre : undefined;
   const nombre = typeof bruto === "string" ? bruto.trim() : "";
