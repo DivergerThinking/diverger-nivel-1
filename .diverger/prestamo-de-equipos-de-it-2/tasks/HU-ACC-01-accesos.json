@@ -2,10 +2,14 @@
   "schemaVersion": 1,
   "id": "HU-ACC-01-accesos",
   "title": "Accesos: entrar con la cuenta de Google de la empresa (HU-ACC-01)",
-  "status": "pending",
+  "status": "done",
   "story": "HU-ACC-01",
   "context": "accesos",
-  "modules": ["src/accesos"],
-  "contracts": ["spec/contextos/accesos/api.openapi.json"],
+  "modules": [
+    "src/accesos"
+  ],
+  "contracts": [
+    "spec/contextos/accesos/api.openapi.json"
+  ],
   "dependsOn": []
 }
