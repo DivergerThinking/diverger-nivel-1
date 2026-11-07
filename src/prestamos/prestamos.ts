@@ -145,6 +145,21 @@ export async function devolverEquipo(almacen: Almacen, id: string): Promise<Resu
   });
 }
 
+export type PrestamoVencido = components["schemas"]["PrestamoVencido"];
+
+/** Los equipos prestados cuya devolución es anterior a `hoy`, del más antiguo al más reciente. */
+export async function listarVencidos(almacen: Almacen, hoy: string = hoyEnMadrid()): Promise<PrestamoVencido[]> {
+  const activos = await almacen.listar<DocumentoPrestamoActivo>("prestamos_activos");
+  const vencidos: PrestamoVencido[] = [];
+  for (const activo of activos) {
+    if (activo.estado !== "prestado" || activo.devolucion >= hoy) continue;
+    const documento = await almacen.obtener<DocumentoEquipo>("equipos", activo.equipoId);
+    if (documento === undefined) continue;
+    vencidos.push({ id: activo.equipoId, nombre: documento.nombre, persona: activo.persona, devolucion: activo.devolucion });
+  }
+  return vencidos.sort((a, b) => a.devolucion.localeCompare(b.devolucion) || a.nombre.localeCompare(b.nombre, "es"));
+}
+
 /** Los equipos del catálogo con su estado, ordenados por nombre. */
 export async function listarEquipos(almacen: Almacen): Promise<Equipo[]> {
   const nombres = await almacen.listar<DocumentoNombre>("equipos_nombres");
