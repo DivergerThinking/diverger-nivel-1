@@ -112,6 +112,26 @@ export async function entregarEquipo(
 }
 
 /**
+ * Apunta la devolución de un equipo prestado: el equipo vuelve a estar disponible (sin préstamo activo) y el
+ * préstamo del historial queda devuelto. Ambos cambios van en una transacción, para que dos devoluciones no se pisen.
+ */
+export async function devolverEquipo(
+  almacen: Almacen,
+  equipoId: string,
+): Promise<{ tipo: "disponible"; equipo: Equipo } | { tipo: "no-existe" | "no-prestado" }> {
+  const equipo = await getEquipment(almacen, equipoId);
+  if (equipo === undefined) return { tipo: "no-existe" };
+  return almacen.transaccion<{ tipo: "disponible"; equipo: Equipo } | { tipo: "no-existe" | "no-prestado" }>(async (tx) => {
+    const activo = await tx.obtener<PrestamoActivo>(ACTIVOS, equipo.id);
+    if (activo === undefined || activo.estado !== "prestado") return { tipo: "no-prestado" };
+    const prestamo = await tx.obtener<Prestamo>(HISTORIAL, activo.prestamoId);
+    tx.borrar(ACTIVOS, equipo.id);
+    if (prestamo !== undefined) tx.guardar(HISTORIAL, activo.prestamoId, { ...prestamo, estado: "devuelto" } satisfies Prestamo);
+    return { tipo: "disponible", equipo: { id: equipo.id, nombre: equipo.nombre, estado: "disponible" } };
+  });
+}
+
+/**
  * Presta un equipo disponible en el mostrador: queda prestado a la persona indicada. IT puede poner una fecha
  * anterior a hoy, porque a veces apunta los préstamos con retraso. El préstamo activo se lee y se escribe junto
  * al historial en una transacción, para no prestar un equipo ya reservado o prestado.

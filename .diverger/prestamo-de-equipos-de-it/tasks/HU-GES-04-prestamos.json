@@ -2,10 +2,17 @@
   "schemaVersion": 1,
   "id": "HU-GES-04-prestamos",
   "title": "Préstamos: apuntar la devolución de un equipo (HU-GES-04)",
-  "status": "pending",
+  "status": "done",
   "story": "HU-GES-04",
   "context": "prestamos",
-  "modules": ["src/prestamos"],
-  "contracts": ["spec/contextos/prestamos/api.openapi.json"],
-  "dependsOn": ["HU-SOL-03-prestamos", "HU-GES-03-prestamos"]
+  "modules": [
+    "src/prestamos"
+  ],
+  "contracts": [
+    "spec/contextos/prestamos/api.openapi.json"
+  ],
+  "dependsOn": [
+    "HU-SOL-03-prestamos",
+    "HU-GES-03-prestamos"
+  ]
 }

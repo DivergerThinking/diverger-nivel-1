@@ -3,7 +3,7 @@ import type { FastifyPluginAsync } from "fastify";
 import "../../lib/auth.js";
 import type { OpcionesContexto } from "../../lib/datos.js";
 import { isItAccount } from "../equipos/index.js";
-import { entregarEquipo, hoyEnMadrid, listarEquipos, pedirEquipo, prestarEquipo } from "./prestamos.js";
+import { devolverEquipo, entregarEquipo, hoyEnMadrid, listarEquipos, pedirEquipo, prestarEquipo } from "./prestamos.js";
 
 /** Rutas del contrato spec/contextos/prestamos/api.openapi.json. */
 export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) => {
@@ -38,6 +38,20 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
       case "no-reservado":
         return reply.code(409).send({ error: "El equipo no está reservado" });
       case "prestado":
+        return reply.code(200).send(resultado.equipo);
+    }
+  });
+  app.post<{ Params: { id: string } }>("/api/equipos/:id/devolucion", async (request, reply) => {
+    if (!isItAccount(request.persona?.email ?? "")) {
+      return reply.code(403).send({ error: "Solo IT puede hacer esto." });
+    }
+    const resultado = await devolverEquipo(almacen, request.params.id);
+    switch (resultado.tipo) {
+      case "no-existe":
+        return reply.code(404).send({ error: "No existe el equipo" });
+      case "no-prestado":
+        return reply.code(409).send({ error: "El equipo no está prestado" });
+      case "disponible":
         return reply.code(200).send(resultado.equipo);
     }
   });
