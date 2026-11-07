@@ -5,7 +5,7 @@
   "status": "pending",
   "story": "HU-EQU-02",
   "context": "prestamos",
-  "modules": ["src/prestamos"],
+  "modules": ["src/prestamos", "src/equipos"],
   "contracts": ["spec/contextos/prestamos/api.openapi.json"],
   "dependsOn": ["HU-EQU-01-equipos", "HU-ACC-01-equipos"]
 }
