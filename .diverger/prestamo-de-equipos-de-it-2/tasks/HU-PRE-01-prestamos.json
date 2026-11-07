@@ -2,10 +2,17 @@
   "schemaVersion": 1,
   "id": "HU-PRE-01-prestamos",
   "title": "Préstamos: entregar un equipo reservado (HU-PRE-01)",
-  "status": "pending",
+  "status": "done",
   "story": "HU-PRE-01",
   "context": "prestamos",
-  "modules": ["src/prestamos"],
-  "contracts": ["spec/contextos/prestamos/api.openapi.json"],
-  "dependsOn": ["HU-SOL-02-prestamos", "HU-SOL-01-prestamos"]
+  "modules": [
+    "src/prestamos"
+  ],
+  "contracts": [
+    "spec/contextos/prestamos/api.openapi.json"
+  ],
+  "dependsOn": [
+    "HU-SOL-02-prestamos",
+    "HU-SOL-01-prestamos"
+  ]
 }
