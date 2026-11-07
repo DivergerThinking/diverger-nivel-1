@@ -3,7 +3,7 @@ import type { FastifyPluginAsync } from "fastify";
 import "../../lib/auth.js";
 import type { OpcionesContexto } from "../../lib/datos.js";
 import { isItAccount } from "../equipos/index.js";
-import { devolverEquipo, entregarEquipo, hoyEnMadrid, listarEquipos, pedirEquipo, prestarEquipo } from "./prestamos.js";
+import { devolverEquipo, entregarEquipo, hoyEnMadrid, listarEquipos, listarVencidos, pedirEquipo, prestarEquipo } from "./prestamos.js";
 
 /** Rutas del contrato spec/contextos/prestamos/api.openapi.json. */
 export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) => {
@@ -73,6 +73,12 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
       case "prestado":
         return reply.code(201).send(resultado.equipo);
     }
+  });
+  app.get("/api/prestamos/vencidos", async (request, reply) => {
+    if (!isItAccount(request.persona?.email ?? "")) {
+      return reply.code(403).send({ error: "Solo IT puede hacer esto." });
+    }
+    return reply.code(200).send(await listarVencidos(almacen, hoyEnMadrid()));
   });
   return Promise.resolve();
 };

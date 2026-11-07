@@ -164,6 +164,23 @@ export async function prestarEquipo(
   });
 }
 
+export type Vencido = components["schemas"]["Vencido"];
+
+/** Equipos prestados cuya devolución es anterior a `hoy`, del más antiguo al más reciente (a igual fecha, por nombre). */
+export async function listarVencidos(almacen: Almacen, hoy: string): Promise<Vencido[]> {
+  const [equipos, activos] = await Promise.all([listEquipment(almacen), almacen.listar<PrestamoActivo>(ACTIVOS)]);
+  const nombres = new Map(equipos.map(({ id, nombre }) => [id, nombre]));
+  return activos
+    .filter((activo) => activo.estado === "prestado" && activo.devolucion < hoy && nombres.has(activo.equipoId))
+    .map((activo): Vencido => ({
+      id: activo.equipoId,
+      nombre: nombres.get(activo.equipoId) ?? "",
+      persona: activo.persona,
+      devolucion: activo.devolucion,
+    }))
+    .sort((a, b) => a.devolucion.localeCompare(b.devolucion) || a.nombre.localeCompare(b.nombre));
+}
+
 /** Lista los equipos con su estado: sin préstamo activo está disponible, y sin persona ni devolución. */
 export async function listarEquipos(almacen: Almacen): Promise<Equipo[]> {
   const [equipos, activos] = await Promise.all([listEquipment(almacen), almacen.listar<PrestamoActivo>(ACTIVOS)]);
