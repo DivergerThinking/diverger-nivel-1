@@ -116,6 +116,24 @@ describe("POST /api/equipos/{id}/solicitud", () => {
     expect([a.statusCode, b.statusCode].sort()).toEqual([201, 409]);
   });
 
+  it("con diez solicitudes simultáneas de personas distintas una devuelve 201 y las otras nueve 409", async () => {
+    await darDeAlta("e1", "Portátil 07");
+    const personas = Array.from({ length: 10 }, (_, i) => `empleado${i}@empresa.com`);
+
+    const respuestas = await Promise.all(personas.map((p) => solicitar("e1", { devolucion: "2026-11-20" }, p)));
+
+    const exitosas = respuestas.filter((r) => r.statusCode === 201);
+    const rechazadas = respuestas.filter((r) => r.statusCode === 409);
+    expect(exitosas).toHaveLength(1);
+    expect(rechazadas).toHaveLength(9);
+    for (const r of rechazadas) expect(r.json()).toEqual({ error: "El equipo no está disponible" });
+    const ganadora = exitosas[0]?.json<{ persona: string }>().persona;
+    expect(await almacen.listar("prestamos_activos")).toEqual([
+      expect.objectContaining({ equipoId: "e1", persona: ganadora, estado: "reservado" }),
+    ]);
+    expect(await almacen.listar("prestamos_historial")).toHaveLength(1);
+  });
+
   it("un equipo que no existe responde 404", async () => {
     const respuesta = await solicitar("no-existe", { devolucion: "2026-11-20" }, "ana.perez@empresa.com");
     expect(respuesta.statusCode).toBe(404);
@@ -362,7 +380,10 @@ describe("POST /api/equipos/{id}/prestamo", () => {
       prestar("e1", { persona: "luis.gomez@empresa.com", devolucion: "2026-11-20" }, IT),
     ]);
     expect([a.statusCode, b.statusCode].sort()).toEqual([201, 409]);
+    const rechazada = a.statusCode === 409 ? a : b;
+    expect(rechazada.json()).toEqual({ error: "El equipo no está disponible" });
     expect(await almacen.listar("prestamos_activos")).toHaveLength(1);
+    expect(await almacen.listar("prestamos_historial")).toHaveLength(1);
   });
 
   it("una cuenta que no es de IT responde 403 y el equipo sigue disponible", async () => {
