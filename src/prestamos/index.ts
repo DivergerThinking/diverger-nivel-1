@@ -3,7 +3,8 @@ import type { FastifyPluginAsync } from "fastify";
 import "../../lib/auth.js";
 import type { OpcionesContexto } from "../../lib/datos.js";
 import type { components } from "./api.gen.js";
-import { listarEquipos, solicitarEquipo, validarDevolucion } from "./prestamos.js";
+import { esIT } from "../accesos/index.js";
+import { entregarEquipo, listarEquipos, solicitarEquipo, validarDevolucion } from "./prestamos.js";
 
 export { type Equipo } from "./prestamos.js";
 
@@ -28,6 +29,14 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     if (resultado.ok) return reply.code(201).send(resultado.equipo);
     if (resultado.error === "no-existe") return reply.code(404).send({ error: "No existe el equipo" });
     return reply.code(409).send({ error: "El equipo no está disponible" });
+  });
+  app.post<{ Params: { id: string } }>("/api/equipos/:id/entrega", async (request, reply) => {
+    if (!request.persona) return reply.code(401).send({ error: "Inicia sesión con Google." });
+    if (!esIT(request)) return reply.code(403).send({ error: "Solo IT puede hacer esto." });
+    const resultado = await entregarEquipo(almacen, request.params.id);
+    if (resultado.ok) return reply.code(200).send(resultado.equipo);
+    if (resultado.error === "no-existe") return reply.code(404).send({ error: "No existe el equipo" });
+    return reply.code(409).send({ error: "El equipo no está reservado" });
   });
   return Promise.resolve();
 };

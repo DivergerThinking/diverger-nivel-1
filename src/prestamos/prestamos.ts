@@ -11,6 +11,8 @@ export interface DocumentoPrestamoActivo {
   persona: string;
   devolucion: string;
   estado: "reservado" | "prestado";
+  /** Id de su entrada en `prestamos_historial`, para pasarla de «reservado» a «prestado». */
+  historialId?: string;
 }
 
 // Lo único que se lee del catálogo del contexto «equipos»: el id y el nombre de cada equipo.
@@ -72,7 +74,8 @@ export async function solicitarEquipo(
     if (documento === undefined) return { ok: false, error: "no-existe" };
     const activo = await tx.obtener<DocumentoPrestamoActivo>("prestamos_activos", id);
     if (activo !== undefined) return { ok: false, error: "no-disponible" };
-    const nuevo: DocumentoPrestamoActivo = { equipoId: id, persona, devolucion, estado: "reservado" };
+    const historialId = randomUUID();
+    const nuevo: DocumentoPrestamoActivo = { equipoId: id, persona, devolucion, estado: "reservado", historialId };
     const entrada: DocumentoHistorial = {
       equipoId: id,
       persona,
@@ -81,8 +84,35 @@ export async function solicitarEquipo(
       creado: new Date().toISOString(),
     };
     tx.guardar("prestamos_activos", id, nuevo);
-    tx.guardar("prestamos_historial", randomUUID(), entrada);
+    tx.guardar("prestamos_historial", historialId, entrada);
     return { ok: true, equipo: equipoConEstado(id, documento.nombre, nuevo) };
+  });
+}
+
+export type ResultadoEntrega = { ok: true; equipo: Equipo } | { ok: false; error: "no-existe" | "no-reservado" };
+
+/** Pasa un equipo reservado a prestado, con su persona y su fecha, y la entrada del historial de «reservado» a «prestado». */
+export async function entregarEquipo(almacen: Almacen, id: string): Promise<ResultadoEntrega> {
+  return almacen.transaccion<ResultadoEntrega>(async (tx) => {
+    const documento = await tx.obtener<DocumentoEquipo>("equipos", id);
+    if (documento === undefined) return { ok: false, error: "no-existe" };
+    const activo = await tx.obtener<DocumentoPrestamoActivo>("prestamos_activos", id);
+    if (activo?.estado !== "reservado") return { ok: false, error: "no-reservado" };
+    // La entrada de la reserva se reescribe por el id que guardó la solicitud; una reserva sin él
+    // (anterior a este campo) deja una entrada nueva. Primero las lecturas y después las escrituras.
+    const historialId = activo.historialId ?? randomUUID();
+    const anterior = activo.historialId === undefined ? undefined : await tx.obtener<DocumentoHistorial>("prestamos_historial", historialId);
+    const prestado: DocumentoPrestamoActivo = { ...activo, estado: "prestado" };
+    tx.guardar("prestamos_activos", id, prestado);
+    const entrada: DocumentoHistorial = {
+      equipoId: id,
+      persona: activo.persona,
+      devolucion: activo.devolucion,
+      estado: "prestado",
+      creado: anterior?.creado ?? new Date().toISOString(),
+    };
+    tx.guardar("prestamos_historial", historialId, entrada);
+    return { ok: true, equipo: equipoConEstado(id, documento.nombre, prestado) };
   });
 }
 
