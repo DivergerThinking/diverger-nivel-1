@@ -2,10 +2,16 @@
   "schemaVersion": 1,
   "id": "HU-ACC-02-accesos",
   "title": "Accesos: reservar las operaciones de IT a las cuentas de IT (HU-ACC-02)",
-  "status": "pending",
+  "status": "done",
   "story": "HU-ACC-02",
   "context": "accesos",
-  "modules": ["src/accesos"],
-  "contracts": ["spec/contextos/accesos/api.openapi.json"],
-  "dependsOn": ["HU-ACC-01-accesos"]
+  "modules": [
+    "src/accesos"
+  ],
+  "contracts": [
+    "spec/contextos/accesos/api.openapi.json"
+  ],
+  "dependsOn": [
+    "HU-ACC-01-accesos"
+  ]
 }
