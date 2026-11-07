@@ -1,4 +1,5 @@
 // Lógica interna del contexto: los demás contextos no pueden importar este fichero.
+import { randomUUID } from "node:crypto";
 import type { Almacen } from "../../lib/datos.js";
 import type { components } from "./api.gen.js";
 
@@ -24,6 +25,43 @@ interface DocumentoNombre {
 export function equipoConEstado(id: string, nombre: string, activo: DocumentoPrestamoActivo | undefined): Equipo {
   if (activo === undefined) return { id, nombre, estado: "disponible" };
   return { id, nombre, estado: activo.estado, persona: activo.persona, devolucion: activo.devolucion };
+}
+
+/** Documento de `prestamos_historial`: una entrada por préstamo, con el momento en que se creó para ordenar. */
+export interface DocumentoHistorial {
+  equipoId: string;
+  persona: string;
+  devolucion: string;
+  estado: "reservado" | "prestado" | "devuelto";
+  creado: string;
+}
+
+export type ResultadoSolicitud = { ok: true; equipo: Equipo } | { ok: false; error: "no-existe" | "no-disponible" };
+
+/** Reserva un equipo disponible a nombre de la persona, en una transacción que escribe el préstamo y el historial. */
+export async function solicitarEquipo(
+  almacen: Almacen,
+  id: string,
+  persona: string,
+  devolucion: string,
+): Promise<ResultadoSolicitud> {
+  return almacen.transaccion<ResultadoSolicitud>(async (tx) => {
+    const documento = await tx.obtener<DocumentoEquipo>("equipos", id);
+    if (documento === undefined) return { ok: false, error: "no-existe" };
+    const activo = await tx.obtener<DocumentoPrestamoActivo>("prestamos_activos", id);
+    if (activo !== undefined) return { ok: false, error: "no-disponible" };
+    const nuevo: DocumentoPrestamoActivo = { equipoId: id, persona, devolucion, estado: "reservado" };
+    const entrada: DocumentoHistorial = {
+      equipoId: id,
+      persona,
+      devolucion,
+      estado: "reservado",
+      creado: new Date().toISOString(),
+    };
+    tx.guardar("prestamos_activos", id, nuevo);
+    tx.guardar("prestamos_historial", randomUUID(), entrada);
+    return { ok: true, equipo: equipoConEstado(id, documento.nombre, nuevo) };
+  });
 }
 
 /** Los equipos del catálogo con su estado, ordenados por nombre. */
