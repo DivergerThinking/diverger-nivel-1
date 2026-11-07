@@ -111,6 +111,39 @@ export async function entregarEquipo(
   });
 }
 
+/**
+ * Presta un equipo disponible en el mostrador: queda prestado a la persona indicada. IT puede poner una fecha
+ * anterior a hoy, porque a veces apunta los préstamos con retraso. El préstamo activo se lee y se escribe junto
+ * al historial en una transacción, para no prestar un equipo ya reservado o prestado.
+ */
+export async function prestarEquipo(
+  almacen: Almacen,
+  equipoId: string,
+  persona: unknown,
+  devolucion: unknown,
+): Promise<{ tipo: "prestado"; equipo: Equipo } | { tipo: "faltan-datos" | "fecha-no-valida" | "no-existe" | "no-disponible" }> {
+  type Resultado = { tipo: "prestado"; equipo: Equipo } | { tipo: "faltan-datos" | "fecha-no-valida" | "no-existe" | "no-disponible" };
+  if (typeof persona !== "string" || persona.trim() === "") return { tipo: "faltan-datos" };
+  if (devolucion === undefined || devolucion === null || devolucion === "") return { tipo: "faltan-datos" };
+  if (typeof devolucion !== "string" || !esFechaValida(devolucion)) return { tipo: "fecha-no-valida" };
+  const equipo = await getEquipment(almacen, equipoId);
+  if (equipo === undefined) return { tipo: "no-existe" };
+  return almacen.transaccion<Resultado>(async (tx) => {
+    if ((await tx.obtener<PrestamoActivo>(ACTIVOS, equipo.id)) !== undefined) return { tipo: "no-disponible" };
+    const prestamoId = randomUUID();
+    tx.guardar(ACTIVOS, equipo.id, { equipoId: equipo.id, estado: "prestado", persona, devolucion, prestamoId } satisfies PrestamoActivo);
+    tx.guardar(HISTORIAL, prestamoId, {
+      id: prestamoId,
+      equipoId: equipo.id,
+      persona,
+      devolucion,
+      estado: "prestado",
+      creadoEn: new Date().toISOString(),
+    } satisfies Prestamo);
+    return { tipo: "prestado", equipo: { id: equipo.id, nombre: equipo.nombre, estado: "prestado", persona, devolucion } };
+  });
+}
+
 /** Lista los equipos con su estado: sin préstamo activo está disponible, y sin persona ni devolución. */
 export async function listarEquipos(almacen: Almacen): Promise<Equipo[]> {
   const [equipos, activos] = await Promise.all([listEquipment(almacen), almacen.listar<PrestamoActivo>(ACTIVOS)]);
