@@ -1,0 +1,6 @@
+stateDiagram-v2
+    [*] --> disponible: Dar de alta
+    disponible --> reservado: Pedir un equipo
+    reservado --> prestado: Entregar
+    disponible --> prestado: Prestar en el mostrador
+    prestado --> disponible: Apuntar la devolución
