@@ -8,6 +8,7 @@ import { entregarEquipo } from "./entrega.js";
 import { listarEquiposConEstado } from "./estados.js";
 import { prestarEquipo } from "./mostrador.js";
 import { solicitarEquipo } from "./solicitud.js";
+import { listarVencidos } from "./vencidos.js";
 
 /**
  * Rutas del contrato spec/contextos/prestamos/api.openapi.json.
@@ -37,5 +38,6 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     if (!resultado.ok) return reply.code(resultado.codigo).send({ error: resultado.error });
     return reply.code(200).send(resultado.equipo);
   });
+  app.get("/api/prestamos/vencidos", { preHandler: exigirIt }, async () => listarVencidos(almacen, new Date()));
   return Promise.resolve();
 };
