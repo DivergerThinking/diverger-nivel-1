@@ -5,6 +5,7 @@ import "../../lib/auth.js";
 import { exigirIt } from "../equipos/index.js";
 import { entregarEquipo } from "./entrega.js";
 import { listarEquiposConEstado } from "./estados.js";
+import { prestarEquipo } from "./mostrador.js";
 import { solicitarEquipo } from "./solicitud.js";
 
 /**
@@ -24,6 +25,11 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     const resultado = await entregarEquipo(almacen, request.params.id);
     if (!resultado.ok) return reply.code(resultado.codigo).send({ error: resultado.error });
     return reply.code(200).send(resultado.equipo);
+  });
+  app.post<{ Params: { id: string } }>("/api/equipos/:id/prestamo", { preHandler: exigirIt }, async (request, reply) => {
+    const resultado = await prestarEquipo(almacen, request.params.id, request.body, new Date());
+    if (!resultado.ok) return reply.code(resultado.codigo).send({ error: resultado.error });
+    return reply.code(201).send(resultado.equipo);
   });
   return Promise.resolve();
 };
