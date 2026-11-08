@@ -107,6 +107,21 @@ export async function entregarEquipo(
   });
 }
 
+/** Apunta la devolución del equipo prestado: el préstamo pasa a devuelto y deja de ser el activo; todo en una transacción. */
+export async function devolverEquipo(
+  almacen: Almacen,
+  equipo: { id: string; nombre: string },
+): Promise<EquipoConEstado | "no-prestado"> {
+  return almacen.transaccion(async (tx) => {
+    const activo = await tx.obtener<PrestamoActivo>(ACTIVOS, equipo.id);
+    const prestamo = activo && (await tx.obtener<Prestamo>(PRESTAMOS, activo.prestamoId));
+    if (!prestamo || prestamo.estado !== "prestado") return "no-prestado";
+    tx.guardar(PRESTAMOS, prestamo.id, { ...prestamo, estado: "devuelto" } satisfies Prestamo);
+    tx.borrar(ACTIVOS, equipo.id);
+    return { id: equipo.id, nombre: equipo.nombre, estado: "disponible" };
+  });
+}
+
 /** Los equipos dados de alta (nombre y id) con su estado: disponible sin préstamo activo, o el de su préstamo. */
 export async function listarEquiposConEstado(
   almacen: Almacen,

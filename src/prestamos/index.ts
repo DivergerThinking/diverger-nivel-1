@@ -5,6 +5,7 @@ import type { OpcionesContexto } from "../../lib/datos.js";
 import { obtenerCuenta } from "../cuentas/index.js";
 import { listarEquipos, obtenerEquipo } from "../equipos/index.js";
 import {
+  devolverEquipo,
   entregarEquipo,
   hoyEnMadrid,
   listarEquiposConEstado,
@@ -68,6 +69,18 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     const prestado = await prestarEquipo(almacen, equipo, persona, cuerpo.devolucion as string);
     if (prestado === "no-disponible") return reply.code(409).send({ error: "El equipo no está disponible" });
     return reply.code(201).send(prestado);
+  });
+
+  app.post<{ Params: { id: string } }>("/api/equipos/:id/devolucion", async (request, reply) => {
+    if (!request.persona) return reply.code(401).send({ error: "Inicia sesión con Google." });
+    if (!obtenerCuenta(request.persona).esIT) return reply.code(403).send({ error: "Solo IT puede hacer esto." });
+
+    const equipo = await obtenerEquipo(almacen, request.params.id);
+    if (!equipo) return reply.code(404).send({ error: "No existe el equipo" });
+
+    const devuelto = await devolverEquipo(almacen, equipo);
+    if (devuelto === "no-prestado") return reply.code(409).send({ error: "El equipo no está prestado" });
+    return reply.code(200).send(devuelto);
   });
   return Promise.resolve();
 };
