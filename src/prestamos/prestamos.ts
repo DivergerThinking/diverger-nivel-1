@@ -181,6 +181,26 @@ export async function listarVencidos(almacen: Almacen, hoy: string): Promise<Ven
     .sort((a, b) => a.devolucion.localeCompare(b.devolucion) || a.nombre.localeCompare(b.nombre));
 }
 
+export interface EntradaHistorial {
+  persona: string;
+  devolucion: string;
+  estado: EstadoPrestamo;
+}
+
+export type ResultadoHistorial = { ok: true; historial: EntradaHistorial[] } | { ok: false; motivo: "no-existe" };
+
+/** Préstamos del equipo, del más reciente al más antiguo según el momento en que se abrieron. */
+export async function obtenerHistorial(almacen: Almacen, idEquipo: string): Promise<ResultadoHistorial> {
+  const equipo = await obtenerEquipo(almacen, idEquipo);
+  if (!equipo) return { ok: false, motivo: "no-existe" };
+  const prestamos = await almacen.listar<Prestamo>(COLECCION_PRESTAMOS);
+  const historial = prestamos
+    .filter((p) => p.equipo === equipo.id)
+    .sort((a, b) => b.creado.localeCompare(a.creado))
+    .map(({ persona, devolucion, estado }): EntradaHistorial => ({ persona, devolucion, estado }));
+  return { ok: true, historial };
+}
+
 /** Todos los equipos con su estado; persona y devolución solo si están reservados o prestados. */
 export async function listarEquiposConEstado(almacen: Almacen): Promise<EquipoConEstado[]> {
   const equipos = await listarEquipos(almacen);

@@ -10,6 +10,7 @@ import {
   hoyEnMadrid,
   listarEquiposConEstado,
   listarVencidos,
+  obtenerHistorial,
   prestarEquipo,
   validarDevolucion,
   validarDevolucionMostrador,
@@ -79,6 +80,13 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     if (correoDeSesion(request) === null) return reply.code(401).send({ error: "Inicia sesión con Google." });
     if (!exigirIt(request, reply)) return reply;
     return listarVencidos(almacen, hoyEnMadrid());
+  });
+  app.get<{ Params: { id: string } }>("/api/equipos/:id/historial", async (request, reply) => {
+    if (correoDeSesion(request) === null) return reply.code(401).send({ error: "Inicia sesión con Google." });
+    if (!exigirIt(request, reply)) return reply;
+    const resultado = await obtenerHistorial(almacen, request.params.id);
+    if (resultado.ok) return resultado.historial;
+    return reply.code(404).send({ error: "No existe el equipo" });
   });
   return Promise.resolve();
 };
