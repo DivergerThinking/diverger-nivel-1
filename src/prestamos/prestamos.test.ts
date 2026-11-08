@@ -239,6 +239,134 @@ describe("POST /api/equipos/{id}/entrega", () => {
   });
 });
 
+describe("POST /api/equipos/{id}/prestamo", () => {
+  const tecnica: Persona = { email: "tecnico@empresa.com", nombre: "Técnico" };
+
+  beforeEach(() => {
+    vi.stubEnv("CORREOS_IT", "tecnico@empresa.com");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-09T10:00:00+01:00"));
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.useRealTimers();
+  });
+
+  function prestar(servidorListo: FastifyInstance, id: string, cuerpo: unknown) {
+    return servidorListo.inject({ method: "POST", url: `/api/equipos/${id}/prestamo`, payload: cuerpo as object });
+  }
+
+  it("presta un equipo disponible a la persona indicada", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    const app1 = await servidor(tecnica, almacen);
+    const respuesta = await prestar(app1, "eq-7", { persona: "ana.perez@empresa.com", devolucion: "2026-11-20" });
+    expect(respuesta.statusCode).toBe(201);
+    expect(respuesta.json()).toEqual({
+      id: "eq-7",
+      nombre: "Portátil 07",
+      estado: "prestado",
+      persona: "ana.perez@empresa.com",
+      devolucion: "2026-11-20",
+    });
+    const lista = await app1.inject({ method: "GET", url: "/api/equipos" });
+    expect(lista.json()).toContainEqual(expect.objectContaining({ id: "eq-7", estado: "prestado" }));
+  });
+
+  it("acepta una fecha anterior a hoy", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    const respuesta = await prestar(await servidor(tecnica, almacen), "eq-7", {
+      persona: "ana.perez@empresa.com",
+      devolucion: "2026-11-05",
+    });
+    expect(respuesta.statusCode).toBe(201);
+    expect(respuesta.json()).toMatchObject({ estado: "prestado", devolucion: "2026-11-05" });
+  });
+
+  it("rechaza un préstamo sin persona", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    const respuesta = await prestar(await servidor(tecnica, almacen), "eq-7", { devolucion: "2026-11-20" });
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: "Faltan la persona o la fecha de devolución" });
+  });
+
+  it("rechaza un préstamo sin fecha y el equipo sigue disponible", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    const app1 = await servidor(tecnica, almacen);
+    const respuesta = await prestar(app1, "eq-7", { persona: "ana.perez@empresa.com" });
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: "Faltan la persona o la fecha de devolución" });
+    const lista = await app1.inject({ method: "GET", url: "/api/equipos" });
+    expect(lista.json()).toEqual([{ id: "eq-7", nombre: "Portátil 07", estado: "disponible" }]);
+  });
+
+  it.each(["2026-02-30", "20-11-2026", "2026-13-01"])("rechaza la fecha no válida %s", async (devolucion) => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    const respuesta = await prestar(await servidor(tecnica, almacen), "eq-7", { persona: "ana.perez@empresa.com", devolucion });
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: "La fecha de devolución no es válida" });
+  });
+
+  it("responde 409 si el equipo está reservado y no crea otro préstamo", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    await conPrestamo(almacen, "eq-7", "reservado");
+    const respuesta = await prestar(await servidor(tecnica, almacen), "eq-7", {
+      persona: "luis@empresa.com",
+      devolucion: "2026-11-20",
+    });
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está disponible" });
+    expect(await almacen.listar(COLECCION_PRESTAMOS)).toHaveLength(1);
+  });
+
+  it("de dos préstamos simultáneos uno recibe 201 y el otro 409", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    const app1 = await servidor(tecnica, almacen);
+    const respuestas = await Promise.all([
+      prestar(app1, "eq-7", { persona: "ana.perez@empresa.com", devolucion: "2026-11-20" }),
+      prestar(app1, "eq-7", { persona: "luis.gomez@empresa.com", devolucion: "2026-11-20" }),
+    ]);
+    expect(respuestas.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+    expect(await almacen.listar(COLECCION_PRESTAMOS)).toHaveLength(1);
+  });
+
+  it("responde 404 si el equipo no existe", async () => {
+    const respuesta = await prestar(await servidor(tecnica, almacenEnMemoria()), "eq-99", {
+      persona: "ana.perez@empresa.com",
+      devolucion: "2026-11-20",
+    });
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("responde 403 si la cuenta no es de IT y no presta el equipo", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    const respuesta = await prestar(await servidor(empleada, almacen), "eq-7", {
+      persona: "ana.perez@empresa.com",
+      devolucion: "2026-11-20",
+    });
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+    expect(await almacen.listar(COLECCION_PRESTAMOS)).toHaveLength(0);
+  });
+
+  it("responde 401 sin sesión", async () => {
+    const respuesta = await prestar(await servidor(null, almacenEnMemoria()), "eq-7", {
+      persona: "ana.perez@empresa.com",
+      devolucion: "2026-11-20",
+    });
+    expect(respuesta.statusCode).toBe(401);
+    expect(respuesta.json()).toEqual({ error: "Inicia sesión con Google." });
+  });
+});
+
 describe("GET /api/equipos", () => {
   it("lista un equipo disponible sin persona ni devolución y otro prestado con ambas", async () => {
     const almacen = almacenEnMemoria();
