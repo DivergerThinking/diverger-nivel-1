@@ -1,0 +1,461 @@
+{
+  "confirmations": {
+    "HU-ACC-01": {
+      "DoR-04": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Reglas funcionales necesarias cerradas.",
+        "source": "assumption"
+      },
+      "DoR-05": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Diseño/prototipo o referencia UI disponible cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-06": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Fuentes/campos de datos identificados cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-07": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Datos de prueba suficientes o estrategia de mock definida.",
+        "source": "assumption"
+      },
+      "DoR-09": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Permisos/roles definidos si afectan a la historia.",
+        "source": "assumption"
+      }
+    },
+    "HU-ACC-02": {
+      "DoR-04": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Reglas funcionales necesarias cerradas.",
+        "source": "assumption"
+      },
+      "DoR-05": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Diseño/prototipo o referencia UI disponible cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-06": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Fuentes/campos de datos identificados cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-07": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Datos de prueba suficientes o estrategia de mock definida.",
+        "source": "assumption"
+      },
+      "DoR-09": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Permisos/roles definidos si afectan a la historia.",
+        "source": "assumption"
+      }
+    },
+    "HU-EQU-01": {
+      "DoR-04": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Reglas funcionales necesarias cerradas.",
+        "source": "assumption"
+      },
+      "DoR-05": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Diseño/prototipo o referencia UI disponible cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-06": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Fuentes/campos de datos identificados cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-07": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Datos de prueba suficientes o estrategia de mock definida.",
+        "source": "assumption"
+      },
+      "DoR-09": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Permisos/roles definidos si afectan a la historia.",
+        "source": "assumption"
+      }
+    },
+    "HU-EQU-02": {
+      "DoR-04": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Reglas funcionales necesarias cerradas.",
+        "source": "assumption"
+      },
+      "DoR-05": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Diseño/prototipo o referencia UI disponible cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-06": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Fuentes/campos de datos identificados cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-07": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Datos de prueba suficientes o estrategia de mock definida.",
+        "source": "assumption"
+      },
+      "DoR-09": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Permisos/roles definidos si afectan a la historia.",
+        "source": "assumption"
+      }
+    },
+    "HU-PRE-01": {
+      "DoR-04": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Reglas funcionales necesarias cerradas.",
+        "source": "assumption"
+      },
+      "DoR-05": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Diseño/prototipo o referencia UI disponible cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-06": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Fuentes/campos de datos identificados cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-07": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Datos de prueba suficientes o estrategia de mock definida.",
+        "source": "assumption"
+      },
+      "DoR-09": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Permisos/roles definidos si afectan a la historia.",
+        "source": "assumption"
+      }
+    },
+    "HU-PRE-02": {
+      "DoR-04": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Reglas funcionales necesarias cerradas.",
+        "source": "assumption"
+      },
+      "DoR-05": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Diseño/prototipo o referencia UI disponible cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-06": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Fuentes/campos de datos identificados cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-07": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Datos de prueba suficientes o estrategia de mock definida.",
+        "source": "assumption"
+      },
+      "DoR-09": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Permisos/roles definidos si afectan a la historia.",
+        "source": "assumption"
+      }
+    },
+    "HU-PRE-03": {
+      "DoR-04": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Reglas funcionales necesarias cerradas.",
+        "source": "assumption"
+      },
+      "DoR-05": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Diseño/prototipo o referencia UI disponible cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-06": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Fuentes/campos de datos identificados cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-07": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Datos de prueba suficientes o estrategia de mock definida.",
+        "source": "assumption"
+      },
+      "DoR-09": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Permisos/roles definidos si afectan a la historia.",
+        "source": "assumption"
+      }
+    },
+    "HU-SEG-01": {
+      "DoR-04": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Reglas funcionales necesarias cerradas.",
+        "source": "assumption"
+      },
+      "DoR-05": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Diseño/prototipo o referencia UI disponible cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-06": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Fuentes/campos de datos identificados cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-07": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Datos de prueba suficientes o estrategia de mock definida.",
+        "source": "assumption"
+      },
+      "DoR-09": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Permisos/roles definidos si afectan a la historia.",
+        "source": "assumption"
+      }
+    },
+    "HU-SEG-02": {
+      "DoR-04": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Reglas funcionales necesarias cerradas.",
+        "source": "assumption"
+      },
+      "DoR-05": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Diseño/prototipo o referencia UI disponible cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-06": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Fuentes/campos de datos identificados cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-07": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Datos de prueba suficientes o estrategia de mock definida.",
+        "source": "assumption"
+      },
+      "DoR-09": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Permisos/roles definidos si afectan a la historia.",
+        "source": "assumption"
+      }
+    },
+    "HU-SOL-01": {
+      "DoR-04": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Reglas funcionales necesarias cerradas.",
+        "source": "assumption"
+      },
+      "DoR-05": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Diseño/prototipo o referencia UI disponible cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-06": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Fuentes/campos de datos identificados cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-07": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Datos de prueba suficientes o estrategia de mock definida.",
+        "source": "assumption"
+      },
+      "DoR-09": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Permisos/roles definidos si afectan a la historia.",
+        "source": "assumption"
+      }
+    },
+    "HU-SOL-02": {
+      "DoR-04": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Reglas funcionales necesarias cerradas.",
+        "source": "assumption"
+      },
+      "DoR-05": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Diseño/prototipo o referencia UI disponible cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-06": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Fuentes/campos de datos identificados cuando aplique.",
+        "source": "assumption"
+      },
+      "DoR-07": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Datos de prueba suficientes o estrategia de mock definida.",
+        "source": "assumption"
+      },
+      "DoR-09": {
+        "answer": "assumed",
+        "at": "2026-11-08T21:18:45Z",
+        "criterion": "Permisos/roles definidos si afectan a la historia.",
+        "source": "assumption"
+      }
+    }
+  },
+  "exceptions": {
+    "HU-ACC-01": {
+      "at": "2026-11-08T21:19:09Z",
+      "reason": "Resuelto en el repositorio: infra/staging.tfvars: google_client_id fija el cliente OAuth de la aplicación",
+      "source": "assumption"
+    },
+    "HU-ACC-02": {
+      "at": "2026-11-08T21:19:09Z",
+      "reason": "Resuelto en el repositorio: infra/staging.tfvars: variables_entorno fija CORREOS_IT en la configuración del despliegue; HU-ACC-01 se planifica antes en el mismo sprint",
+      "source": "assumption"
+    },
+    "HU-EQU-01": {
+      "at": "2026-11-08T21:19:09Z",
+      "reason": "Supuesto razonable: HU-ACC-02 se planifica antes en el mismo sprint",
+      "source": "assumption"
+    },
+    "HU-EQU-02": {
+      "at": "2026-11-08T21:19:09Z",
+      "reason": "Supuesto razonable: HU-EQU-01 se planifica antes en el mismo sprint",
+      "source": "assumption"
+    },
+    "HU-PRE-01": {
+      "at": "2026-11-08T21:19:09Z",
+      "reason": "Supuesto razonable: HU-SOL-01 se planifica antes en el mismo sprint",
+      "source": "assumption"
+    },
+    "HU-PRE-02": {
+      "at": "2026-11-08T21:19:09Z",
+      "reason": "Supuesto razonable: HU-EQU-01 se planifica antes en el mismo sprint",
+      "source": "assumption"
+    },
+    "HU-PRE-03": {
+      "at": "2026-11-08T21:19:09Z",
+      "reason": "Supuesto razonable: HU-PRE-01 se planifica antes en el mismo sprint",
+      "source": "assumption"
+    },
+    "HU-SEG-01": {
+      "at": "2026-11-08T21:19:09Z",
+      "reason": "Supuesto razonable: HU-PRE-01 se planifica antes en el mismo sprint",
+      "source": "assumption"
+    },
+    "HU-SEG-02": {
+      "at": "2026-11-08T21:19:09Z",
+      "reason": "Supuesto razonable: HU-PRE-03 se planifica antes en el mismo sprint",
+      "source": "assumption"
+    },
+    "HU-SOL-01": {
+      "at": "2026-11-08T21:19:09Z",
+      "reason": "Supuesto razonable: HU-EQU-01 se planifica antes en el mismo sprint",
+      "source": "assumption"
+    },
+    "HU-SOL-02": {
+      "at": "2026-11-08T21:19:09Z",
+      "reason": "Supuesto razonable: HU-SOL-01 y HU-PRE-02 se planifican antes en el mismo sprint",
+      "source": "assumption"
+    }
+  },
+  "notes": {},
+  "version": 1,
+  "written": {
+    "HU-ACC-01": {
+      "pending": "DoR-08: dependencias externas sin plan confirmado: Cliente OAuth de Google de la aplicación · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09",
+      "state": "partial"
+    },
+    "HU-ACC-02": {
+      "pending": "DoR-08: dependencias externas sin plan confirmado: Lista CORREOS_IT en la configuración del despliegue; depende de HU-ACC-01, sin resolver ni planificada en un sprint anterior · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09",
+      "state": "partial"
+    },
+    "HU-EQU-01": {
+      "pending": "DoR-08: depende de HU-ACC-02, sin resolver ni planificada en un sprint anterior · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09",
+      "state": "partial"
+    },
+    "HU-EQU-02": {
+      "pending": "DoR-08: depende de HU-EQU-01, sin resolver ni planificada en un sprint anterior · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09",
+      "state": "partial"
+    },
+    "HU-PRE-01": {
+      "pending": "DoR-08: depende de HU-SOL-01, sin resolver ni planificada en un sprint anterior · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09",
+      "state": "partial"
+    },
+    "HU-PRE-02": {
+      "pending": "DoR-08: depende de HU-EQU-01, sin resolver ni planificada en un sprint anterior · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09",
+      "state": "partial"
+    },
+    "HU-PRE-03": {
+      "pending": "DoR-08: depende de HU-PRE-01, sin resolver ni planificada en un sprint anterior · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09",
+      "state": "partial"
+    },
+    "HU-SEG-01": {
+      "pending": "DoR-08: depende de HU-PRE-01, sin resolver ni planificada en un sprint anterior · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09",
+      "state": "partial"
+    },
+    "HU-SEG-02": {
+      "pending": "DoR-08: depende de HU-PRE-03, sin resolver ni planificada en un sprint anterior · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09",
+      "state": "partial"
+    },
+    "HU-SOL-01": {
+      "pending": "DoR-08: depende de HU-EQU-01, sin resolver ni planificada en un sprint anterior · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09",
+      "state": "partial"
+    },
+    "HU-SOL-02": {
+      "pending": "DoR-08: depende de HU-SOL-01, HU-PRE-02, sin resolver ni planificada en un sprint anterior · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09",
+      "state": "partial"
+    }
+  }
+}

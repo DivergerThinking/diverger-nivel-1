@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "HU-SOL-02-prestamos",
+  "title": "Préstamos: evitar que dos personas se queden el mismo equipo (HU-SOL-02)",
+  "status": "pending",
+  "story": "HU-SOL-02",
+  "context": "prestamos",
+  "modules": ["src/prestamos"],
+  "contracts": ["spec/contextos/prestamos/api.openapi.json"],
+  "dependsOn": ["HU-PRE-02-prestamos", "HU-SOL-01-prestamos"]
+}
