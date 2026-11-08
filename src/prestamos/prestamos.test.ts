@@ -411,6 +411,93 @@ describe("POST /api/equipos/{id}/prestamo", () => {
   });
 });
 
+describe("POST /api/equipos/{id}/devolucion", () => {
+  const tecnica: Persona = { email: "tecnico@empresa.com", nombre: "Técnico" };
+
+  beforeEach(() => {
+    vi.stubEnv("CORREOS_IT", "tecnico@empresa.com");
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  function devolver(servidorListo: FastifyInstance, id: string) {
+    return servidorListo.inject({ method: "POST", url: `/api/equipos/${id}/devolucion` });
+  }
+
+  it("apunta la devolución de un equipo prestado y queda disponible", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    await conPrestamo(almacen, "eq-7", "prestado");
+    const app1 = await servidor(tecnica, almacen);
+    const respuesta = await devolver(app1, "eq-7");
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual({ id: "eq-7", nombre: "Portátil 07", estado: "disponible" });
+    const lista = await app1.inject({ method: "GET", url: "/api/equipos" });
+    expect(lista.json()).toEqual([{ id: "eq-7", nombre: "Portátil 07", estado: "disponible" }]);
+  });
+
+  it("conserva el préstamo como devuelto y el equipo se puede volver a prestar", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    await conPrestamo(almacen, "eq-7", "prestado");
+    const app1 = await servidor(tecnica, almacen);
+    await devolver(app1, "eq-7");
+    expect(await almacen.listar<Prestamo>(COLECCION_PRESTAMOS)).toEqual([expect.objectContaining({ estado: "devuelto" })]);
+    expect(await almacen.obtener(COLECCION_ACTIVOS, "eq-7")).toBeUndefined();
+    const nuevo = await app1.inject({
+      method: "POST",
+      url: "/api/equipos/eq-7/prestamo",
+      payload: { persona: "luis.gomez@empresa.com", devolucion: "2026-12-01" },
+    });
+    expect(nuevo.statusCode).toBe(201);
+  });
+
+  it("responde 409 si el equipo está reservado y sigue reservado", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    await conPrestamo(almacen, "eq-7", "reservado");
+    const app1 = await servidor(tecnica, almacen);
+    const respuesta = await devolver(app1, "eq-7");
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está prestado" });
+    const lista = await app1.inject({ method: "GET", url: "/api/equipos" });
+    expect(lista.json()).toContainEqual(expect.objectContaining({ id: "eq-7", estado: "reservado" }));
+  });
+
+  it("responde 409 si el equipo está disponible", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    const respuesta = await devolver(await servidor(tecnica, almacen), "eq-7");
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está prestado" });
+  });
+
+  it("responde 404 si el equipo no existe", async () => {
+    const respuesta = await devolver(await servidor(tecnica, almacenEnMemoria()), "eq-99");
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("responde 403 si la cuenta no es de IT y el equipo sigue prestado", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    await conPrestamo(almacen, "eq-7", "prestado");
+    const app1 = await servidor(empleada, almacen);
+    const respuesta = await devolver(app1, "eq-7");
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+    const lista = await app1.inject({ method: "GET", url: "/api/equipos" });
+    expect(lista.json()).toContainEqual(expect.objectContaining({ id: "eq-7", estado: "prestado" }));
+  });
+
+  it("responde 401 sin sesión", async () => {
+    const respuesta = await devolver(await servidor(null, almacenEnMemoria()), "eq-7");
+    expect(respuesta.statusCode).toBe(401);
+    expect(respuesta.json()).toEqual({ error: "Inicia sesión con Google." });
+  });
+});
+
 describe("GET /api/equipos", () => {
   it("lista un equipo disponible sin persona ni devolución y otro prestado con ambas", async () => {
     const almacen = almacenEnMemoria();

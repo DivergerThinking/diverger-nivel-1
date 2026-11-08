@@ -5,6 +5,7 @@ import { correoDeSesion, exigirIt } from "../cuentas/index.js";
 import type { components } from "./api.gen.js";
 import {
   crearSolicitud,
+  devolverEquipo,
   entregarEquipo,
   hoyEnMadrid,
   listarEquiposConEstado,
@@ -64,6 +65,14 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     if (resultado.ok) return reply.code(201).send(resultado.equipo);
     if (resultado.motivo === "no-existe") return reply.code(404).send({ error: "No existe el equipo" });
     return reply.code(409).send({ error: "El equipo no está disponible" });
+  });
+  app.post<{ Params: { id: string } }>("/api/equipos/:id/devolucion", async (request, reply) => {
+    if (correoDeSesion(request) === null) return reply.code(401).send({ error: "Inicia sesión con Google." });
+    if (!exigirIt(request, reply)) return reply;
+    const resultado = await devolverEquipo(almacen, request.params.id);
+    if (resultado.ok) return reply.code(200).send(resultado.equipo);
+    if (resultado.motivo === "no-existe") return reply.code(404).send({ error: "No existe el equipo" });
+    return reply.code(409).send({ error: "El equipo no está prestado" });
   });
   return Promise.resolve();
 };
