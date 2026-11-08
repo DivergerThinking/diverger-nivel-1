@@ -1,5 +1,5 @@
 import Fastify, { type FastifyInstance } from "fastify";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Persona } from "../../lib/auth.js";
 import { almacenEnMemoria, type Almacen } from "../../lib/datos.js";
 import { rutas } from "./index.js";
@@ -41,6 +41,125 @@ async function conPrestamo(almacen: Almacen, equipo: string, estado: Prestamo["e
 afterEach(async () => {
   await app?.close();
   app = undefined;
+});
+
+const ana: Persona = { email: "ana.perez@empresa.com", nombre: "Ana" };
+
+function pedir(servidorListo: FastifyInstance, id: string, cuerpo: unknown) {
+  return servidorListo.inject({ method: "POST", url: `/api/equipos/${id}/solicitud`, payload: cuerpo as object });
+}
+
+describe("POST /api/equipos/{id}/solicitud", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-09T10:00:00+01:00"));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reserva un equipo disponible a nombre de quien lo pide", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    const app1 = await servidor(ana, almacen);
+    const respuesta = await pedir(app1, "eq-7", { devolucion: "2026-11-20" });
+    expect(respuesta.statusCode).toBe(201);
+    expect(respuesta.json()).toEqual({
+      id: "eq-7",
+      nombre: "Portátil 07",
+      estado: "reservado",
+      persona: "ana.perez@empresa.com",
+      devolucion: "2026-11-20",
+    });
+    const lista = await app1.inject({ method: "GET", url: "/api/equipos" });
+    expect(lista.json()).toContainEqual(expect.objectContaining({ id: "eq-7", estado: "reservado" }));
+  });
+
+  it("acepta la fecha de hoy en Madrid", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    const respuesta = await pedir(await servidor(ana, almacen), "eq-7", { devolucion: "2026-11-09" });
+    expect(respuesta.statusCode).toBe(201);
+    expect(respuesta.json()).toMatchObject({ estado: "reservado", devolucion: "2026-11-09" });
+  });
+
+  it("hoy es el día de Madrid aunque en UTC sea otro", async () => {
+    vi.setSystemTime(new Date("2026-11-09T23:30:00Z"));
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    const app1 = await servidor(ana, almacen);
+    expect((await pedir(app1, "eq-7", { devolucion: "2026-11-09" })).statusCode).toBe(400);
+    expect((await pedir(app1, "eq-7", { devolucion: "2026-11-10" })).statusCode).toBe(201);
+  });
+
+  it("rechaza una fecha anterior a hoy y el equipo sigue disponible", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    const app1 = await servidor(ana, almacen);
+    const respuesta = await pedir(app1, "eq-7", { devolucion: "2026-11-08" });
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: "La fecha de devolución ya ha pasado" });
+    const lista = await app1.inject({ method: "GET", url: "/api/equipos" });
+    expect(lista.json()).toEqual([{ id: "eq-7", nombre: "Portátil 07", estado: "disponible" }]);
+  });
+
+  it.each(["2026-02-30", "20-11-2026", "mañana", "2026-13-01"])("rechaza la fecha no válida %s", async (devolucion) => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    const respuesta = await pedir(await servidor(ana, almacen), "eq-7", { devolucion });
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: "La fecha de devolución no es válida" });
+  });
+
+  it("rechaza una fecha que no es texto", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    const respuesta = await pedir(await servidor(ana, almacen), "eq-7", { devolucion: 20261120 });
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: "La fecha de devolución no es válida" });
+  });
+
+  it("rechaza una solicitud sin fecha", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    const respuesta = await pedir(await servidor(ana, almacen), "eq-7", {});
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: "Falta la fecha de devolución" });
+  });
+
+  it("responde 409 si el equipo está prestado", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    await conPrestamo(almacen, "eq-7", "prestado");
+    const respuesta = await pedir(await servidor(ana, almacen), "eq-7", { devolucion: "2026-11-20" });
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está disponible" });
+  });
+
+  it("responde 409 si el equipo ya está reservado y no cambia la reserva", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    const app1 = await servidor(ana, almacen);
+    await pedir(app1, "eq-7", { devolucion: "2026-11-20" });
+    const respuesta = await pedir(app1, "eq-7", { devolucion: "2026-12-01" });
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está disponible" });
+    expect(await almacen.listar(COLECCION_PRESTAMOS)).toHaveLength(1);
+  });
+
+  it("responde 404 si el equipo no existe", async () => {
+    const respuesta = await pedir(await servidor(ana, almacenEnMemoria()), "eq-99", { devolucion: "2026-11-20" });
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("responde 401 sin sesión", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    const respuesta = await pedir(await servidor(null, almacen), "eq-7", { devolucion: "2026-11-20" });
+    expect(respuesta.statusCode).toBe(401);
+    expect(respuesta.json()).toEqual({ error: "Inicia sesión con Google." });
+  });
 });
 
 describe("GET /api/equipos", () => {
