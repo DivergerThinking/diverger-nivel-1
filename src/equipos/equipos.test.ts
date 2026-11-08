@@ -135,6 +135,55 @@ describe("POST /api/equipos", () => {
     }
   });
 
+  it("con varios correos en CORREOS_IT, un token de «IT@empresa.com» da de alta el equipo", async () => {
+    process.env["CORREOS_IT"] = "it@empresa.com,inventario@empresa.com";
+    const almacen = almacenEnMemoria();
+    const app = await servidor({ email: "IT@empresa.com", nombre: "IT" }, almacen);
+    try {
+      const respuesta = await app.inject({ method: "POST", url: "/api/equipos", payload: { nombre: "Portátil 07" } });
+      expect(respuesta.statusCode).toBe(201);
+      expect(await listarEquipos(almacen)).toHaveLength(1);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("la cuenta de servicio incluida en CORREOS_IT también da de alta equipos", async () => {
+    process.env["CORREOS_IT"] = "it@empresa.com, Inventario@empresa.com ";
+    const app = await servidor({ email: "inventario@empresa.com", nombre: "Inventario" }, almacenEnMemoria());
+    try {
+      const respuesta = await app.inject({ method: "POST", url: "/api/equipos", payload: { nombre: "Portátil 08" } });
+      expect(respuesta.statusCode).toBe(201);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("con varios correos en CORREOS_IT, «ana.perez@empresa.com» recibe 403 y no se crea ningún equipo", async () => {
+    process.env["CORREOS_IT"] = "it@empresa.com,inventario@empresa.com";
+    const almacen = almacenEnMemoria();
+    const app = await servidor({ email: "ana.perez@empresa.com", nombre: "Ana" }, almacen);
+    try {
+      const respuesta = await app.inject({ method: "POST", url: "/api/equipos", payload: { nombre: "Portátil 07" } });
+      expect(respuesta.statusCode).toBe(403);
+      expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+      expect(await listarEquipos(almacen)).toEqual([]);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("sin CORREOS_IT nadie es de IT: responde 403", async () => {
+    delete process.env["CORREOS_IT"];
+    const app = await servidor(IT, almacenEnMemoria());
+    try {
+      const respuesta = await app.inject({ method: "POST", url: "/api/equipos", payload: { nombre: "Portátil 07" } });
+      expect(respuesta.statusCode).toBe(403);
+    } finally {
+      await app.close();
+    }
+  });
+
   it("sin sesión responde 401 «Inicia sesión con Google.»", async () => {
     const app = await servidor(null, almacenEnMemoria());
     try {
