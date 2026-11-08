@@ -498,6 +498,91 @@ describe("POST /api/equipos/{id}/devolucion", () => {
   });
 });
 
+describe("GET /api/prestamos/vencidos", () => {
+  const tecnica: Persona = { email: "tecnico@empresa.com", nombre: "Técnico" };
+
+  beforeEach(() => {
+    vi.stubEnv("CORREOS_IT", "tecnico@empresa.com");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-09T10:00:00+01:00"));
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.useRealTimers();
+  });
+
+  function vencidos(servidorListo: FastifyInstance) {
+    return servidorListo.inject({ method: "GET", url: "/api/prestamos/vencidos" });
+  }
+
+  async function prestar(almacen: Almacen, equipo: string, devolucion: string, estado: Prestamo["estado"] = "prestado") {
+    const prestamo: Prestamo = {
+      id: `p-${equipo}`,
+      equipo,
+      persona: "ana.perez@empresa.com",
+      devolucion,
+      estado,
+      creado: "2026-10-01T10:00:00.000Z",
+    };
+    await almacen.guardar(COLECCION_PRESTAMOS, prestamo.id, prestamo);
+    if (estado !== "devuelto") await almacen.guardar(COLECCION_ACTIVOS, equipo, { prestamo: prestamo.id });
+  }
+
+  it("lista los prestados con devolución anterior a hoy, del más antiguo al más reciente, sin el que vence hoy", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "e7", "Portátil 07");
+    await darDeAlta(almacen, "e2", "Monitor 02");
+    await darDeAlta(almacen, "e1", "Proyector 01");
+    await prestar(almacen, "e7", "2026-11-05");
+    await prestar(almacen, "e2", "2026-11-01");
+    await prestar(almacen, "e1", "2026-11-09");
+    const respuesta = await vencidos(await servidor(tecnica, almacen));
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual([
+      { id: "e2", nombre: "Monitor 02", persona: "ana.perez@empresa.com", devolucion: "2026-11-01" },
+      { id: "e7", nombre: "Portátil 07", persona: "ana.perez@empresa.com", devolucion: "2026-11-05" },
+    ]);
+  });
+
+  it("no incluye un equipo reservado aunque su fecha haya pasado", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "e7", "Portátil 07");
+    await prestar(almacen, "e7", "2026-11-05", "reservado");
+    const respuesta = await vencidos(await servidor(tecnica, almacen));
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual([]);
+  });
+
+  it("no incluye un préstamo ya devuelto", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "e7", "Portátil 07");
+    await prestar(almacen, "e7", "2026-11-05", "devuelto");
+    expect((await vencidos(await servidor(tecnica, almacen))).json()).toEqual([]);
+  });
+
+  it("hoy es el día de Madrid aunque en UTC sea otro", async () => {
+    vi.setSystemTime(new Date("2026-11-09T23:30:00Z"));
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "e7", "Portátil 07");
+    await prestar(almacen, "e7", "2026-11-09");
+    expect((await vencidos(await servidor(tecnica, almacen))).json()).toEqual([
+      { id: "e7", nombre: "Portátil 07", persona: "ana.perez@empresa.com", devolucion: "2026-11-09" },
+    ]);
+  });
+
+  it("responde 403 si la cuenta no es de IT", async () => {
+    const respuesta = await vencidos(await servidor(empleada, almacenEnMemoria()));
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+  });
+
+  it("responde 401 sin sesión", async () => {
+    const respuesta = await vencidos(await servidor(null, almacenEnMemoria()));
+    expect(respuesta.statusCode).toBe(401);
+    expect(respuesta.json()).toEqual({ error: "Inicia sesión con Google." });
+  });
+});
+
 describe("GET /api/equipos", () => {
   it("lista un equipo disponible sin persona ni devolución y otro prestado con ambas", async () => {
     const almacen = almacenEnMemoria();

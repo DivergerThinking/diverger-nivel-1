@@ -159,6 +159,28 @@ export async function devolverEquipo(almacen: Almacen, idEquipo: string): Promis
   });
 }
 
+export interface Vencido {
+  id: string;
+  nombre: string;
+  persona: string;
+  devolucion: string;
+}
+
+/** Equipos prestados cuya devolución es anterior a `hoy`, del más antiguo al más reciente; los reservados no cuentan. */
+export async function listarVencidos(almacen: Almacen, hoy: string): Promise<Vencido[]> {
+  const prestamos = await almacen.listar<Prestamo>(COLECCION_PRESTAMOS);
+  const vencidos = prestamos.filter((p) => p.estado === "prestado" && p.devolucion < hoy);
+  const filas = await Promise.all(
+    vencidos.map(async (p): Promise<Vencido | null> => {
+      const equipo = await obtenerEquipo(almacen, p.equipo);
+      return equipo ? { id: equipo.id, nombre: equipo.nombre, persona: p.persona, devolucion: p.devolucion } : null;
+    }),
+  );
+  return filas
+    .filter((fila): fila is Vencido => fila !== null)
+    .sort((a, b) => a.devolucion.localeCompare(b.devolucion) || a.nombre.localeCompare(b.nombre));
+}
+
 /** Todos los equipos con su estado; persona y devolución solo si están reservados o prestados. */
 export async function listarEquiposConEstado(almacen: Almacen): Promise<EquipoConEstado[]> {
   const equipos = await listarEquipos(almacen);
