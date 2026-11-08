@@ -9,6 +9,7 @@ import {
   entregarEquipo,
   hoyEnMadrid,
   listarEquiposConEstado,
+  listarVencidos,
   prestarEquipo,
   validarDevolucion,
   validarDevolucionMostrador,
@@ -73,6 +74,11 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     if (resultado.ok) return reply.code(200).send(resultado.equipo);
     if (resultado.motivo === "no-existe") return reply.code(404).send({ error: "No existe el equipo" });
     return reply.code(409).send({ error: "El equipo no está prestado" });
+  });
+  app.get("/api/prestamos/vencidos", async (request, reply) => {
+    if (correoDeSesion(request) === null) return reply.code(401).send({ error: "Inicia sesión con Google." });
+    if (!exigirIt(request, reply)) return reply;
+    return listarVencidos(almacen, hoyEnMadrid());
   });
   return Promise.resolve();
 };
