@@ -154,6 +154,16 @@ describe("POST /api/equipos/{id}/solicitud", () => {
       pedir(almacen, id, { devolucion: "2026-11-21" }, { email: "luis.gomez@empresa.com", nombre: "Luis" }),
     ]);
     expect(resultados.map((r) => r.codigo).sort()).toEqual([201, 409]);
+    const perdedora = resultados.find((r) => r.codigo === 409);
+    const ganadora = resultados.find((r) => r.codigo === 201);
+    expect(perdedora?.cuerpo).toEqual({ error: "El equipo no está disponible" });
+    expect(ganadora?.cuerpo).toMatchObject({ id, estado: "reservado" });
+    expect(await almacen.listar(PRESTAMOS)).toHaveLength(1);
+    expect(await almacen.listar(ACTIVOS)).toHaveLength(1);
+    expect(await estadoDe(almacen, id)).toMatchObject({
+      estado: "reservado",
+      persona: (ganadora?.cuerpo as { persona: string }).persona,
+    });
   });
 
   it("un equipo que no existe responde 404 «No existe el equipo»", async () => {
@@ -398,7 +408,9 @@ describe("POST /api/equipos/{id}/prestamo", () => {
         }),
       ]);
       expect(respuestas.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+      expect(respuestas.find((r) => r.statusCode === 409)?.json()).toEqual({ error: "El equipo no está disponible" });
       expect(await almacen.listar(ACTIVOS)).toHaveLength(1);
+      expect(await almacen.listar(PRESTAMOS)).toHaveLength(1);
     } finally {
       await app.close();
       await appIT.close();
