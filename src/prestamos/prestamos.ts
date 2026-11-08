@@ -64,13 +64,44 @@ export type ResultadoSolicitud =
   | { ok: true; equipo: EquipoConEstado }
   | { ok: false; motivo: "no-existe" | "no-disponible" };
 
+/** Sin límite por abajo: IT puede apuntar en el mostrador préstamos con fecha anterior a hoy. */
+const SIN_LIMITE_POR_ABAJO = "0000-01-01";
+
+/** Valida la fecha de un préstamo en el mostrador: texto AAAA-MM-DD de un día real, pasado o no. */
+export function validarDevolucionMostrador(valor: unknown): { ok: true; devolucion: string } | { ok: false; motivo: "no-valida" } {
+  const fecha = validarDevolucion(valor, SIN_LIMITE_POR_ABAJO);
+  return fecha.ok ? fecha : { ok: false, motivo: "no-valida" };
+}
+
 /** Reserva el equipo a nombre de la persona si no tiene préstamo activo, en una transacción sobre `prestamos_activos`. */
-export async function crearSolicitud(
+export function crearSolicitud(
   almacen: Almacen,
   idEquipo: string,
   persona: string,
   devolucion: string,
   ahora: Date = new Date(),
+): Promise<ResultadoSolicitud> {
+  return abrirPrestamo(almacen, idEquipo, persona, devolucion, "reservado", ahora);
+}
+
+/** Presta el equipo en el mostrador a la persona si no tiene préstamo activo, en una transacción sobre `prestamos_activos`. */
+export function prestarEquipo(
+  almacen: Almacen,
+  idEquipo: string,
+  persona: string,
+  devolucion: string,
+  ahora: Date = new Date(),
+): Promise<ResultadoSolicitud> {
+  return abrirPrestamo(almacen, idEquipo, persona, devolucion, "prestado", ahora);
+}
+
+async function abrirPrestamo(
+  almacen: Almacen,
+  idEquipo: string,
+  persona: string,
+  devolucion: string,
+  estado: "reservado" | "prestado",
+  ahora: Date,
 ): Promise<ResultadoSolicitud> {
   const equipo = await obtenerEquipo(almacen, idEquipo);
   if (!equipo) return { ok: false, motivo: "no-existe" };
@@ -81,12 +112,12 @@ export async function crearSolicitud(
       equipo: equipo.id,
       persona,
       devolucion,
-      estado: "reservado",
+      estado,
       creado: ahora.toISOString(),
     };
     tx.guardar(COLECCION_PRESTAMOS, prestamo.id, prestamo);
     tx.guardar(COLECCION_ACTIVOS, equipo.id, { prestamo: prestamo.id } satisfies Activo);
-    return { ok: true, equipo: { id: equipo.id, nombre: equipo.nombre, estado: "reservado", persona, devolucion } };
+    return { ok: true, equipo: { id: equipo.id, nombre: equipo.nombre, estado, persona, devolucion } };
   });
 }
 
