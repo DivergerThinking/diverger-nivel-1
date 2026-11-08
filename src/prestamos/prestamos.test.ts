@@ -147,6 +147,47 @@ describe("POST /api/equipos/{id}/solicitud", () => {
     expect(await almacen.listar(COLECCION_PRESTAMOS)).toHaveLength(1);
   });
 
+  it("de dos solicitudes simultáneas de personas distintas una recibe 201 y la otra 409", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    const app1 = await servidor(ana, almacen);
+    const app2 = await servidor({ email: "luis.gomez@empresa.com", nombre: "Luis" }, almacen);
+    const [r1, r2] = await Promise.all([
+      pedir(app1, "eq-7", { devolucion: "2026-11-20" }),
+      pedir(app2, "eq-7", { devolucion: "2026-11-20" }),
+    ]);
+    const respuestas = [r1, r2];
+    const ganadora = respuestas.find((r) => r.statusCode === 201);
+    const perdedora = respuestas.find((r) => r.statusCode === 409);
+    expect(ganadora).toBeDefined();
+    expect(perdedora?.json()).toEqual({ error: "El equipo no está disponible" });
+    expect(ganadora?.json()).toMatchObject({ id: "eq-7", estado: "reservado" });
+    expect(await almacen.listar(COLECCION_PRESTAMOS)).toHaveLength(1);
+    const lista = await app2.inject({ method: "GET", url: "/api/equipos" });
+    expect(lista.json()).toEqual([
+      expect.objectContaining({ id: "eq-7", estado: "reservado", persona: (ganadora?.json() as { persona: string }).persona }),
+    ]);
+  });
+
+  it("una solicitud y un préstamo en el mostrador simultáneos no se quedan el mismo equipo", async () => {
+    vi.stubEnv("CORREOS_IT", "tecnico@empresa.com");
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    const app1 = await servidor(ana, almacen);
+    const app2 = await servidor({ email: "tecnico@empresa.com", nombre: "Técnico" }, almacen);
+    const respuestas = await Promise.all([
+      pedir(app1, "eq-7", { devolucion: "2026-11-20" }),
+      app2.inject({
+        method: "POST",
+        url: "/api/equipos/eq-7/prestamo",
+        payload: { persona: "luis.gomez@empresa.com", devolucion: "2026-11-20" },
+      }),
+    ]);
+    vi.unstubAllEnvs();
+    expect(respuestas.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+    expect(await almacen.listar(COLECCION_PRESTAMOS)).toHaveLength(1);
+  });
+
   it("responde 404 si el equipo no existe", async () => {
     const respuesta = await pedir(await servidor(ana, almacenEnMemoria()), "eq-99", { devolucion: "2026-11-20" });
     expect(respuesta.statusCode).toBe(404);
@@ -333,7 +374,10 @@ describe("POST /api/equipos/{id}/prestamo", () => {
       prestar(app1, "eq-7", { persona: "luis.gomez@empresa.com", devolucion: "2026-11-20" }),
     ]);
     expect(respuestas.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+    expect(respuestas.find((r) => r.statusCode === 409)?.json()).toEqual({ error: "El equipo no está disponible" });
     expect(await almacen.listar(COLECCION_PRESTAMOS)).toHaveLength(1);
+    const lista = await app1.inject({ method: "GET", url: "/api/equipos" });
+    expect(lista.json()).toEqual([expect.objectContaining({ id: "eq-7", estado: "prestado" })]);
   });
 
   it("responde 404 si el equipo no existe", async () => {
