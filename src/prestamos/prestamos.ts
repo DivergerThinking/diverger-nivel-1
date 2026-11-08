@@ -122,6 +122,27 @@ export async function devolverEquipo(
   });
 }
 
+export type Vencido = components["schemas"]["Vencido"];
+
+/** Los equipos prestados cuya devolución es anterior a hoy, del más antiguo al más reciente. */
+export async function listarVencidos(
+  almacen: Almacen,
+  equipos: readonly { id: string; nombre: string }[],
+  hoy: string,
+): Promise<Vencido[]> {
+  const vencidos = await Promise.all(
+    equipos.map(async (equipo): Promise<Vencido | null> => {
+      const activo = await almacen.obtener<PrestamoActivo>(ACTIVOS, equipo.id);
+      const prestamo = activo && (await almacen.obtener<Prestamo>(PRESTAMOS, activo.prestamoId));
+      if (!prestamo || prestamo.estado !== "prestado" || prestamo.devolucion >= hoy) return null;
+      return { id: equipo.id, nombre: equipo.nombre, persona: prestamo.persona, devolucion: prestamo.devolucion };
+    }),
+  );
+  return vencidos
+    .filter((vencido): vencido is Vencido => vencido !== null)
+    .sort((a, b) => a.devolucion.localeCompare(b.devolucion) || a.nombre.localeCompare(b.nombre));
+}
+
 /** Los equipos dados de alta (nombre y id) con su estado: disponible sin préstamo activo, o el de su préstamo. */
 export async function listarEquiposConEstado(
   almacen: Almacen,

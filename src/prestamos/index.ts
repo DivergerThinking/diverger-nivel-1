@@ -9,6 +9,7 @@ import {
   entregarEquipo,
   hoyEnMadrid,
   listarEquiposConEstado,
+  listarVencidos,
   prestarEquipo,
   reservarEquipo,
   validarDevolucion,
@@ -81,6 +82,12 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     const devuelto = await devolverEquipo(almacen, equipo);
     if (devuelto === "no-prestado") return reply.code(409).send({ error: "El equipo no está prestado" });
     return reply.code(200).send(devuelto);
+  });
+
+  app.get("/api/prestamos/vencidos", async (request, reply) => {
+    if (!request.persona) return reply.code(401).send({ error: "Inicia sesión con Google." });
+    if (!obtenerCuenta(request.persona).esIT) return reply.code(403).send({ error: "Solo IT puede hacer esto." });
+    return listarVencidos(almacen, await listarEquipos(almacen), hoyEnMadrid());
   });
   return Promise.resolve();
 };
