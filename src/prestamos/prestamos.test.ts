@@ -440,6 +440,110 @@ describe("POST /api/equipos/{id}/prestamo", () => {
   });
 });
 
+describe("POST /api/equipos/{id}/devolucion", () => {
+  async function devolver(almacen: Almacen, id: string, persona: { email: string; nombre: string } | null = IT) {
+    const app = await servidor(persona, almacen);
+    try {
+      const respuesta = await app.inject({ method: "POST", url: `/api/equipos/${id}/devolucion` });
+      return { codigo: respuesta.statusCode, cuerpo: respuesta.json<unknown>() };
+    } finally {
+      await app.close();
+    }
+  }
+
+  async function estadoDe(almacen: Almacen, id: string) {
+    const app = await servidor(EMPLEADA, almacen);
+    try {
+      const respuesta = await app.inject({ method: "GET", url: "/api/equipos" });
+      return respuesta.json<{ id: string; estado: string; persona?: string; devolucion?: string }[]>().find((e) => e.id === id);
+    } finally {
+      await app.close();
+    }
+  }
+
+  it("un equipo prestado vuelve a disponible, sin persona ni devolución, y su préstamo queda devuelto", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await altaDeEquipo(almacen, "Monitor 03");
+    await prestar(almacen, id, { persona: "ana.perez@empresa.com", devolucion: "2026-11-20", estado: "prestado" });
+    const { codigo, cuerpo } = await devolver(almacen, id);
+    expect(codigo).toBe(200);
+    expect(cuerpo).toEqual({ id, nombre: "Monitor 03", estado: "disponible" });
+    expect(await estadoDe(almacen, id)).toEqual({ id, nombre: "Monitor 03", estado: "disponible" });
+    expect(await almacen.listar(ACTIVOS)).toHaveLength(0);
+    expect(await almacen.listar<Prestamo>(PRESTAMOS)).toMatchObject([{ estado: "devuelto", persona: "ana.perez@empresa.com" }]);
+  });
+
+  it("tras la devolución el equipo se puede volver a prestar", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await altaDeEquipo(almacen, "Monitor 03");
+    await prestar(almacen, id, { persona: "ana.perez@empresa.com", devolucion: "2026-11-20", estado: "prestado" });
+    await devolver(almacen, id);
+    const app = await servidor(IT, almacen);
+    try {
+      const respuesta = await app.inject({
+        method: "POST",
+        url: `/api/equipos/${id}/prestamo`,
+        payload: { persona: "luis.gomez@empresa.com", devolucion: "2026-12-01" },
+      });
+      expect(respuesta.statusCode).toBe(201);
+    } finally {
+      await app.close();
+    }
+    expect(await almacen.listar(PRESTAMOS)).toHaveLength(2);
+  });
+
+  it("un equipo disponible responde 409 «El equipo no está prestado»", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await altaDeEquipo(almacen, "Monitor 03");
+    const { codigo, cuerpo } = await devolver(almacen, id);
+    expect(codigo).toBe(409);
+    expect(cuerpo).toEqual({ error: "El equipo no está prestado" });
+    expect(await estadoDe(almacen, id)).toMatchObject({ estado: "disponible" });
+  });
+
+  it("un equipo solo reservado responde 409 y sigue reservado", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await altaDeEquipo(almacen, "Monitor 03");
+    await prestar(almacen, id, { persona: "ana.perez@empresa.com", devolucion: "2026-11-20", estado: "reservado" });
+    const { codigo, cuerpo } = await devolver(almacen, id);
+    expect(codigo).toBe(409);
+    expect(cuerpo).toEqual({ error: "El equipo no está prestado" });
+    expect(await estadoDe(almacen, id)).toMatchObject({ estado: "reservado" });
+  });
+
+  it("devolver dos veces: la segunda responde 409", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await altaDeEquipo(almacen, "Monitor 03");
+    await prestar(almacen, id, { persona: "ana.perez@empresa.com", devolucion: "2026-11-20", estado: "prestado" });
+    expect((await devolver(almacen, id)).codigo).toBe(200);
+    expect((await devolver(almacen, id)).codigo).toBe(409);
+  });
+
+  it("un equipo que no existe responde 404 «No existe el equipo»", async () => {
+    const { codigo, cuerpo } = await devolver(almacenEnMemoria(), "no-existe");
+    expect(codigo).toBe(404);
+    expect(cuerpo).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("una cuenta que no es de IT recibe 403 y el equipo sigue prestado", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await altaDeEquipo(almacen, "Monitor 03");
+    await prestar(almacen, id, { persona: "ana.perez@empresa.com", devolucion: "2026-11-20", estado: "prestado" });
+    const { codigo, cuerpo } = await devolver(almacen, id, EMPLEADA);
+    expect(codigo).toBe(403);
+    expect(cuerpo).toEqual({ error: "Solo IT puede hacer esto." });
+    expect(await estadoDe(almacen, id)).toMatchObject({ estado: "prestado" });
+  });
+
+  it("sin sesión responde 401 «Inicia sesión con Google.»", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await altaDeEquipo(almacen, "Monitor 03");
+    const { codigo, cuerpo } = await devolver(almacen, id, null);
+    expect(codigo).toBe(401);
+    expect(cuerpo).toEqual({ error: "Inicia sesión con Google." });
+  });
+});
+
 describe("GET /api/equipos", () => {
   it("lista un equipo disponible sin persona ni devolución y uno prestado con ambas", async () => {
     const almacen = almacenEnMemoria();
