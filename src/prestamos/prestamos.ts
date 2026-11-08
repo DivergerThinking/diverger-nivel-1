@@ -45,11 +45,31 @@ export function validarDevolucion(valor: unknown, hoy: string): ErrorDeFecha | n
 }
 
 /** Reserva el equipo a la persona si no tiene préstamo activo; la comprobación y la escritura van en una transacción. */
-export async function reservarEquipo(
+export function reservarEquipo(
   almacen: Almacen,
   equipo: { id: string; nombre: string },
   persona: string,
   devolucion: string,
+): Promise<EquipoConEstado | "no-disponible"> {
+  return abrirPrestamo(almacen, equipo, persona, devolucion, "reservado");
+}
+
+/** Presta el equipo a la persona en el mostrador si no tiene préstamo activo; la comprobación y la escritura van en una transacción. */
+export function prestarEquipo(
+  almacen: Almacen,
+  equipo: { id: string; nombre: string },
+  persona: string,
+  devolucion: string,
+): Promise<EquipoConEstado | "no-disponible"> {
+  return abrirPrestamo(almacen, equipo, persona, devolucion, "prestado");
+}
+
+async function abrirPrestamo(
+  almacen: Almacen,
+  equipo: { id: string; nombre: string },
+  persona: string,
+  devolucion: string,
+  estado: "reservado" | "prestado",
 ): Promise<EquipoConEstado | "no-disponible"> {
   return almacen.transaccion(async (tx) => {
     if (await tx.obtener<PrestamoActivo>(ACTIVOS, equipo.id)) return "no-disponible";
@@ -58,12 +78,12 @@ export async function reservarEquipo(
       equipoId: equipo.id,
       persona,
       devolucion,
-      estado: "reservado",
+      estado,
       creadoEn: new Date().toISOString(),
     };
     tx.guardar(PRESTAMOS, prestamo.id, prestamo);
     tx.guardar(ACTIVOS, equipo.id, { prestamoId: prestamo.id } satisfies PrestamoActivo);
-    return { id: equipo.id, nombre: equipo.nombre, estado: "reservado", persona, devolucion };
+    return { id: equipo.id, nombre: equipo.nombre, estado, persona, devolucion };
   });
 }
 
