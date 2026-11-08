@@ -2,14 +2,32 @@
 import type { FastifyPluginAsync } from "fastify";
 import "../../lib/auth.js";
 import type { OpcionesContexto } from "../../lib/datos.js";
-import { listarEquipos } from "../equipos/index.js";
-import { listarEquiposConEstado } from "./prestamos.js";
+import { listarEquipos, obtenerEquipo } from "../equipos/index.js";
+import { hoyEnMadrid, listarEquiposConEstado, reservarEquipo, validarDevolucion } from "./prestamos.js";
 
 /** Rutas del contrato spec/contextos/prestamos/api.openapi.json. */
 export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) => {
   app.get("/api/equipos", async (request, reply) => {
     if (!request.persona) return reply.code(401).send({ error: "Inicia sesión con Google." });
     return listarEquiposConEstado(almacen, await listarEquipos(almacen));
+  });
+
+  app.post<{ Params: { id: string } }>("/api/equipos/:id/solicitud", async (request, reply) => {
+    if (!request.persona) return reply.code(401).send({ error: "Inicia sesión con Google." });
+
+    const equipo = await obtenerEquipo(almacen, request.params.id);
+    if (!equipo) return reply.code(404).send({ error: "No existe el equipo" });
+
+    const cuerpo = request.body;
+    const devolucion = typeof cuerpo === "object" && cuerpo !== null ? (cuerpo as { devolucion?: unknown }).devolucion : undefined;
+    const errorDeFecha = validarDevolucion(devolucion, hoyEnMadrid());
+    if (errorDeFecha === "falta") return reply.code(400).send({ error: "Falta la fecha de devolución" });
+    if (errorDeFecha === "no-valida") return reply.code(400).send({ error: "La fecha de devolución no es válida" });
+    if (errorDeFecha === "pasada") return reply.code(400).send({ error: "La fecha de devolución ya ha pasado" });
+
+    const reservado = await reservarEquipo(almacen, equipo, request.persona.email, devolucion as string);
+    if (reservado === "no-disponible") return reply.code(409).send({ error: "El equipo no está disponible" });
+    return reply.code(201).send(reservado);
   });
   return Promise.resolve();
 };
