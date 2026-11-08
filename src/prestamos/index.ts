@@ -9,6 +9,7 @@ import {
   entregarEquipo,
   hoyEnMadrid,
   listarEquiposConEstado,
+  listarHistorial,
   listarVencidos,
   prestarEquipo,
   reservarEquipo,
@@ -88,6 +89,15 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     if (!request.persona) return reply.code(401).send({ error: "Inicia sesión con Google." });
     if (!obtenerCuenta(request.persona).esIT) return reply.code(403).send({ error: "Solo IT puede hacer esto." });
     return listarVencidos(almacen, await listarEquipos(almacen), hoyEnMadrid());
+  });
+
+  app.get<{ Params: { id: string } }>("/api/equipos/:id/historial", async (request, reply) => {
+    if (!request.persona) return reply.code(401).send({ error: "Inicia sesión con Google." });
+    if (!obtenerCuenta(request.persona).esIT) return reply.code(403).send({ error: "Solo IT puede hacer esto." });
+
+    const equipo = await obtenerEquipo(almacen, request.params.id);
+    if (!equipo) return reply.code(404).send({ error: "No existe el equipo" });
+    return listarHistorial(almacen, equipo.id);
   });
   return Promise.resolve();
 };
