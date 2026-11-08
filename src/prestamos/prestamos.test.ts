@@ -583,6 +583,70 @@ describe("GET /api/prestamos/vencidos", () => {
   });
 });
 
+describe("GET /api/equipos/{id}/historial", () => {
+  const tecnica: Persona = { email: "tecnico@empresa.com", nombre: "Técnico" };
+
+  beforeEach(() => {
+    vi.stubEnv("CORREOS_IT", "tecnico@empresa.com");
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  function historial(servidorListo: FastifyInstance, id: string) {
+    return servidorListo.inject({ method: "GET", url: `/api/equipos/${id}/historial` });
+  }
+
+  async function guardar(almacen: Almacen, id: string, equipo: string, persona: string, devolucion: string, estado: Prestamo["estado"], creado: string) {
+    const prestamo: Prestamo = { id, equipo, persona, devolucion, estado, creado };
+    await almacen.guardar(COLECCION_PRESTAMOS, id, prestamo);
+  }
+
+  it("lista primero el préstamo más reciente y después el más antiguo", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    await guardar(almacen, "p1", "eq-7", "ana.perez@empresa.com", "2026-10-15", "devuelto", "2026-10-01T10:00:00.000Z");
+    await guardar(almacen, "p2", "eq-7", "luis.gomez@empresa.com", "2026-11-20", "reservado", "2026-11-08T10:00:00.000Z");
+    await almacen.guardar(COLECCION_ACTIVOS, "eq-7", { prestamo: "p2" });
+    const respuesta = await historial(await servidor(tecnica, almacen), "eq-7");
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual([
+      { persona: "luis.gomez@empresa.com", devolucion: "2026-11-20", estado: "reservado" },
+      { persona: "ana.perez@empresa.com", devolucion: "2026-10-15", estado: "devuelto" },
+    ]);
+  });
+
+  it("no incluye los préstamos de otros equipos", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    await darDeAlta(almacen, "eq-8", "Monitor 08");
+    await guardar(almacen, "p1", "eq-8", "ana.perez@empresa.com", "2026-10-15", "devuelto", "2026-10-01T10:00:00.000Z");
+    const respuesta = await historial(await servidor(tecnica, almacen), "eq-7");
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual([]);
+  });
+
+  it("responde 404 si el equipo no existe", async () => {
+    const respuesta = await historial(await servidor(tecnica, almacenEnMemoria()), "eq-99");
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("responde 403 si la cuenta no es de IT", async () => {
+    const almacen = almacenEnMemoria();
+    await darDeAlta(almacen, "eq-7", "Portátil 07");
+    const respuesta = await historial(await servidor(empleada, almacen), "eq-7");
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+  });
+
+  it("responde 401 sin sesión", async () => {
+    const respuesta = await historial(await servidor(null, almacenEnMemoria()), "eq-7");
+    expect(respuesta.statusCode).toBe(401);
+    expect(respuesta.json()).toEqual({ error: "Inicia sesión con Google." });
+  });
+});
+
 describe("GET /api/equipos", () => {
   it("lista un equipo disponible sin persona ni devolución y otro prestado con ambas", async () => {
     const almacen = almacenEnMemoria();
