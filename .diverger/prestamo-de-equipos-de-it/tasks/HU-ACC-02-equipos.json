@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "HU-ACC-02-equipos",
+  "title": "Equipos: reservar las operaciones de IT a sus cuentas (HU-ACC-02)",
+  "status": "pending",
+  "story": "HU-ACC-02",
+  "context": "equipos",
+  "modules": ["src/equipos"],
+  "contracts": ["spec/contextos/equipos/api.openapi.json"],
+  "dependsOn": ["HU-EQU-01-equipos", "HU-ACC-01-cuentas"]
+}

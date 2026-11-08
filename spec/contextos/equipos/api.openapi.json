@@ -1,0 +1,104 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Equipos",
+    "version": "1.0.0",
+    "description": "Alta de equipos. Ruta, campos, códigos y mensajes fijados por el cliente para el inventario de IT."
+  },
+  "servers": [{ "url": "/" }],
+  "security": [{ "google": [] }],
+  "paths": {
+    "/api/equipos": {
+      "post": {
+        "operationId": "equipos.crearEquipo",
+        "summary": "Dar de alta un equipo (Solo IT)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/NuevoEquipo" },
+              "example": { "nombre": "Portátil 07" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Equipo dado de alta",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EquipoCreado" },
+                "example": { "id": "…", "nombre": "Portátil 07", "estado": "disponible" }
+              }
+            }
+          },
+          "400": {
+            "description": "Falta el nombre del equipo (el nombre falta o está vacío)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "Falta el nombre del equipo" }
+              }
+            }
+          },
+          "401": {
+            "description": "Inicia sesión con Google.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "Inicia sesión con Google." }
+              }
+            }
+          },
+          "403": {
+            "description": "Solo IT puede hacer esto.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "Solo IT puede hacer esto." }
+              }
+            }
+          },
+          "409": {
+            "description": "Ya hay un equipo con ese nombre",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "Ya hay un equipo con ese nombre" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "google": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Token de identidad de Google, con el correo verificado y emitido para el cliente OAuth de la aplicación (de una persona o de una cuenta de servicio)."
+      }
+    },
+    "schemas": {
+      "NuevoEquipo": {
+        "type": "object",
+        "properties": { "nombre": { "type": "string" } }
+      },
+      "EquipoCreado": {
+        "type": "object",
+        "required": ["id", "nombre", "estado"],
+        "properties": {
+          "id": { "type": "string" },
+          "nombre": { "type": "string" },
+          "estado": { "type": "string", "const": "disponible" }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": { "error": { "type": "string" } }
+      }
+    }
+  }
+}
