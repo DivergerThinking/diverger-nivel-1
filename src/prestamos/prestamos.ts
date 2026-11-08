@@ -143,6 +143,16 @@ export async function listarVencidos(
     .sort((a, b) => a.devolucion.localeCompare(b.devolucion) || a.nombre.localeCompare(b.nombre));
 }
 
+export type EntradaHistorial = components["schemas"]["EntradaHistorial"];
+
+/** Los préstamos de un equipo, del más reciente al más antiguo. */
+export async function listarHistorial(almacen: Almacen, equipoId: string): Promise<EntradaHistorial[]> {
+  const prestamos = (await almacen.listar<Prestamo>(PRESTAMOS)).filter((prestamo) => prestamo.equipoId === equipoId);
+  return prestamos
+    .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn))
+    .map(({ persona, devolucion, estado }) => ({ persona, devolucion, estado }));
+}
+
 /** Los equipos dados de alta (nombre y id) con su estado: disponible sin préstamo activo, o el de su préstamo. */
 export async function listarEquiposConEstado(
   almacen: Almacen,
