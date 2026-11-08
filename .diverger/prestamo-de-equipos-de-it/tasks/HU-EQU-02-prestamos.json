@@ -2,10 +2,20 @@
   "schemaVersion": 1,
   "id": "HU-EQU-02-prestamos",
   "title": "Préstamos: ver los equipos y su estado (HU-EQU-02)",
-  "status": "pending",
+  "status": "done",
   "story": "HU-EQU-02",
   "context": "prestamos",
-  "modules": ["src/prestamos"],
-  "contracts": ["spec/contextos/prestamos/api.openapi.json"],
-  "dependsOn": ["HU-EQU-01-equipos", "HU-ACC-01-cuentas"]
+  "modules": [
+    "src/prestamos"
+  ],
+  "contracts": [
+    "spec/contextos/prestamos/api.openapi.json"
+  ],
+  "dependsOn": [
+    "HU-EQU-01-equipos",
+    "HU-ACC-01-cuentas"
+  ],
+  "failures": [
+    "el test no definía `CORREOS_IT`, así que el alta de equipos como IT devolvía 403 y la lista salía vacía."
+  ]
 }
