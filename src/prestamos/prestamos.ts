@@ -67,6 +67,26 @@ export async function reservarEquipo(
   });
 }
 
+/** Pasa el préstamo reservado del equipo a prestado, con la misma persona y devolución; la comprobación y la escritura van en una transacción. */
+export async function entregarEquipo(
+  almacen: Almacen,
+  equipo: { id: string; nombre: string },
+): Promise<EquipoConEstado | "no-reservado"> {
+  return almacen.transaccion(async (tx) => {
+    const activo = await tx.obtener<PrestamoActivo>(ACTIVOS, equipo.id);
+    const prestamo = activo && (await tx.obtener<Prestamo>(PRESTAMOS, activo.prestamoId));
+    if (!prestamo || prestamo.estado !== "reservado") return "no-reservado";
+    tx.guardar(PRESTAMOS, prestamo.id, { ...prestamo, estado: "prestado" } satisfies Prestamo);
+    return {
+      id: equipo.id,
+      nombre: equipo.nombre,
+      estado: "prestado",
+      persona: prestamo.persona,
+      devolucion: prestamo.devolucion,
+    };
+  });
+}
+
 /** Los equipos dados de alta (nombre y id) con su estado: disponible sin préstamo activo, o el de su préstamo. */
 export async function listarEquiposConEstado(
   almacen: Almacen,
