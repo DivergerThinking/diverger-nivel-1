@@ -1,0 +1,60 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Cuentas",
+    "version": "1.0.0",
+    "description": "Quién ha iniciado sesión y si es una cuenta de IT."
+  },
+  "servers": [{ "url": "/" }],
+  "security": [{ "google": [] }],
+  "paths": {
+    "/api/cuentas/yo": {
+      "get": {
+        "operationId": "cuentas.obtenerCuenta",
+        "summary": "La persona que ha iniciado sesión y si es una cuenta de IT",
+        "responses": {
+          "200": {
+            "description": "La cuenta de la sesión",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Cuenta" } }
+            }
+          },
+          "401": {
+            "description": "Inicia sesión con Google.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "Inicia sesión con Google." }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "google": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Token de identidad de Google, con el correo verificado y emitido para el cliente OAuth de la aplicación (de una persona o de una cuenta de servicio)."
+      }
+    },
+    "schemas": {
+      "Cuenta": {
+        "type": "object",
+        "required": ["email", "esIT"],
+        "properties": {
+          "email": { "type": "string", "description": "Correo del token." },
+          "esIT": { "type": "boolean", "description": "Si el correo está en CORREOS_IT." }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": { "error": { "type": "string" } }
+      }
+    }
+  }
+}

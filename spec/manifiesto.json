@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "initiative": "prestamo-de-equipos-de-it",
+  "status": "approved",
+  "checks": {
+    "constitution": {
+      "result": "pass",
+      "at": "2026-11-08",
+      "notes": []
+    }
+  },
+  "contexts": [
+    {
+      "id": "cuentas",
+      "name": "Cuentas",
+      "path": "spec/contextos/cuentas/",
+      "module": "src/cuentas",
+      "stories": [
+        "HU-ACC-01",
+        "HU-ACC-02"
+      ],
+      "dependsOn": [],
+      "contracts": [
+        {
+          "kind": "openapi",
+          "path": "spec/contextos/cuentas/api.openapi.json"
+        }
+      ],
+      "publishes": [],
+      "subscribes": []
+    },
+    {
+      "id": "equipos",
+      "name": "Equipos",
+      "path": "spec/contextos/equipos/",
+      "module": "src/equipos",
+      "stories": [
+        "HU-EQU-01",
+        "HU-ACC-02"
+      ],
+      "dependsOn": [
+        "cuentas"
+      ],
+      "contracts": [
+        {
+          "kind": "openapi",
+          "path": "spec/contextos/equipos/api.openapi.json"
+        }
+      ],
+      "publishes": [],
+      "subscribes": []
+    },
+    {
+      "id": "prestamos",
+      "name": "Préstamos",
+      "path": "spec/contextos/prestamos/",
+      "module": "src/prestamos",
+      "stories": [
+        "HU-EQU-02",
+        "HU-SOL-01",
+        "HU-SOL-02",
+        "HU-PRE-01",
+        "HU-PRE-02",
+        "HU-PRE-03",
+        "HU-SEG-01",
+        "HU-SEG-02"
+      ],
+      "dependsOn": [
+        "equipos",
+        "cuentas"
+      ],
+      "contracts": [
+        {
+          "kind": "openapi",
+          "path": "spec/contextos/prestamos/api.openapi.json"
+        }
+      ],
+      "publishes": [],
+      "subscribes": []
+    }
+  ],
+  "approved": {
+    "at": "2026-11-08T08:42:13Z",
+    "contracts": {
+      "spec/contextos/cuentas/api.openapi.json": "1.0.0",
+      "spec/contextos/equipos/api.openapi.json": "1.0.0",
+      "spec/contextos/prestamos/api.openapi.json": "1.0.0"
+    },
+    "lastAdr": 4
+  }
+}
