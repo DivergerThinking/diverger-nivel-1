@@ -1,9 +1,9 @@
 // Interfaz pública del contexto «prestamos»: lo único que pueden importar los demás (ADR 0003).
 import type { FastifyPluginAsync } from "fastify";
 import type { OpcionesContexto } from "../../lib/datos.js";
-import { correoDeSesion } from "../cuentas/index.js";
+import { correoDeSesion, exigirIt } from "../cuentas/index.js";
 import type { components } from "./api.gen.js";
-import { crearSolicitud, hoyEnMadrid, listarEquiposConEstado, validarDevolucion, type ErrorFecha } from "./prestamos.js";
+import { crearSolicitud, entregarEquipo, hoyEnMadrid, listarEquiposConEstado, validarDevolucion, type ErrorFecha } from "./prestamos.js";
 
 type Solicitud = components["schemas"]["Solicitud"];
 
@@ -31,6 +31,14 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     if (resultado.ok) return reply.code(201).send(resultado.equipo);
     if (resultado.motivo === "no-existe") return reply.code(404).send({ error: "No existe el equipo" });
     return reply.code(409).send({ error: "El equipo no está disponible" });
+  });
+  app.post<{ Params: { id: string } }>("/api/equipos/:id/entrega", async (request, reply) => {
+    if (correoDeSesion(request) === null) return reply.code(401).send({ error: "Inicia sesión con Google." });
+    if (!exigirIt(request, reply)) return reply;
+    const resultado = await entregarEquipo(almacen, request.params.id);
+    if (resultado.ok) return reply.code(200).send(resultado.equipo);
+    if (resultado.motivo === "no-existe") return reply.code(404).send({ error: "No existe el equipo" });
+    return reply.code(409).send({ error: "El equipo no está reservado" });
   });
   return Promise.resolve();
 };

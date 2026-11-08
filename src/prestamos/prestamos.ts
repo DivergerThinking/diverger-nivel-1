@@ -90,6 +90,26 @@ export async function crearSolicitud(
   });
 }
 
+export type ResultadoEntrega =
+  | { ok: true; equipo: EquipoConEstado }
+  | { ok: false; motivo: "no-existe" | "no-reservado" };
+
+/** Pasa a prestado el préstamo reservado del equipo, con la misma persona y devolución, en una transacción. */
+export async function entregarEquipo(almacen: Almacen, idEquipo: string): Promise<ResultadoEntrega> {
+  const equipo = await obtenerEquipo(almacen, idEquipo);
+  if (!equipo) return { ok: false, motivo: "no-existe" };
+  return almacen.transaccion<ResultadoEntrega>(async (tx) => {
+    const activo = await tx.obtener<Activo>(COLECCION_ACTIVOS, equipo.id);
+    const prestamo = activo && (await tx.obtener<Prestamo>(COLECCION_PRESTAMOS, activo.prestamo));
+    if (!prestamo || prestamo.estado !== "reservado") return { ok: false, motivo: "no-reservado" };
+    tx.guardar(COLECCION_PRESTAMOS, prestamo.id, { ...prestamo, estado: "prestado" } satisfies Prestamo);
+    return {
+      ok: true,
+      equipo: { id: equipo.id, nombre: equipo.nombre, estado: "prestado", persona: prestamo.persona, devolucion: prestamo.devolucion },
+    };
+  });
+}
+
 /** Todos los equipos con su estado; persona y devolución solo si están reservados o prestados. */
 export async function listarEquiposConEstado(almacen: Almacen): Promise<EquipoConEstado[]> {
   const equipos = await listarEquipos(almacen);
