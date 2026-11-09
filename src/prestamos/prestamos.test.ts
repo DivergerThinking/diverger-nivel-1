@@ -4,7 +4,7 @@ import { almacenEnMemoria, type Almacen } from "../../lib/datos.js";
 import { tokenDeCabecera } from "../../lib/auth.js";
 import { rutas as rutasEquipos } from "../equipos/index.js";
 import { COLECCION_ACTIVOS, COLECCION_PRESTAMOS, hoyEnMadrid, solicitarEquipo } from "./prestamo.js";
-import { listarEquiposConEstado, rutas } from "./index.js";
+import { listarEquiposConEstado, listarVencidos, rutas } from "./index.js";
 
 const PERSONAS: Record<string, { email: string; nombre: string }> = {
   lucia: { email: "lucia.gomez@empresa.com", nombre: "Lucía" },
@@ -390,6 +390,66 @@ describe("POST /api/equipos/:id/devolucion", () => {
 
   it("sin sesión responde 401", async () => {
     const r = await app.inject({ method: "POST", url: "/api/equipos/x/devolucion" });
+    expect(r.statusCode).toBe(401);
+  });
+});
+
+const vencidos = (token = "it") =>
+  app.inject({ method: "GET", url: "/api/prestamos/vencidos", headers: { authorization: `Bearer ${token}` } });
+
+describe("GET /api/prestamos/vencidos", () => {
+  it("lista los prestados con devolución anterior a hoy, del más antiguo al más reciente, y deja fuera los vigentes", async () => {
+    const proyector = await darDeAlta("Proyector 01");
+    const monitor = await darDeAlta("Monitor 03");
+    const portatil = await darDeAlta("Portátil 07");
+    await prestar(proyector, { persona: "ana.perez@empresa.com", devolucion: "2025-03-01" });
+    await prestar(monitor, { persona: "marcos.ruiz@empresa.com", devolucion: "2025-01-10" });
+    await prestar(portatil, { persona: "lucia.gomez@empresa.com", devolucion: "2030-06-15" });
+
+    const r = await vencidos();
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toEqual([
+      { id: monitor, nombre: "Monitor 03", persona: "marcos.ruiz@empresa.com", devolucion: "2025-01-10" },
+      { id: proyector, nombre: "Proyector 01", persona: "ana.perez@empresa.com", devolucion: "2025-03-01" },
+    ]);
+  });
+
+  it("un equipo reservado con fecha pasada no es un préstamo vencido: responde 200 con una lista vacía", async () => {
+    const id = await darDeAlta("Portátil 07");
+    await almacen.guardar(COLECCION_ACTIVOS, id, {
+      estado: "reservado",
+      persona: "lucia.gomez@empresa.com",
+      devolucion: "2025-01-10",
+      prestamoId: "p-1",
+    });
+    const r = await vencidos();
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toEqual([]);
+  });
+
+  it("un equipo devuelto deja de aparecer", async () => {
+    const id = await darDeAlta("Monitor 03");
+    await prestar(id, { persona: "marcos.ruiz@empresa.com", devolucion: "2025-01-10" });
+    await devolver(id);
+    expect((await vencidos()).json()).toEqual([]);
+  });
+
+  it("la devolución de hoy en Madrid no ha vencido y la del día anterior sí", async () => {
+    const id = await darDeAlta("Monitor 03");
+    await prestar(id, { persona: "marcos.ruiz@empresa.com", devolucion: "2030-06-14" });
+    // 23:30 UTC del 14 de junio ya es 15 de junio en Madrid.
+    expect(await listarVencidos(almacen, new Date("2030-06-14T23:30:00Z"))).toHaveLength(1);
+    expect(await listarVencidos(almacen, new Date("2030-06-13T23:30:00Z"))).toEqual([]);
+  });
+
+  it("una cuenta que no es de IT responde 403 «Solo IT puede hacer esto.»", async () => {
+    const r = await vencidos("lucia");
+    expect(r.statusCode).toBe(403);
+    expect(r.json()).toEqual({ error: "Solo IT puede hacer esto." });
+  });
+
+  it("sin sesión responde 401", async () => {
+    const r = await app.inject({ method: "GET", url: "/api/prestamos/vencidos" });
     expect(r.statusCode).toBe(401);
   });
 });
