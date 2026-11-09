@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "C-001",
   "title": "Dar de baja equipos averiados o retirados",
-  "status": "proposed",
+  "status": "applied",
   "request": "En la iniciativa prestamo-de-equipos-de-it, añadir una historia nueva: el personal de IT puede dar de baja un equipo averiado o retirado, indicando el motivo; un equipo dado de baja deja de aparecer como disponible y no se puede pedir ni prestar, y si tiene un préstamo activo no se puede dar de baja hasta que se devuelva. No cambia ninguna historia existente.",
   "stories": {
     "added": [
@@ -12,7 +12,9 @@
         "title": "Dar de baja un equipo averiado o retirado",
         "status": "draft",
         "priority": "should",
-        "contexts": ["prestamos"],
+        "contexts": [
+          "prestamos"
+        ],
         "role": "técnico de IT",
         "goal": "dar de baja un equipo averiado o retirado indicando el motivo",
         "benefit": "que deje de aparecer como disponible y nadie lo pida ni lo preste",
@@ -98,5 +100,30 @@
       "replaces": "spec/contextos/prestamos/api.openapi.json",
       "base": "1.0.0"
     }
-  ]
+  ],
+  "appliedAt": "2026-11-09T10:15:02Z",
+  "report": {
+    "stories": {
+      "added": [
+        "HU-EQU-03"
+      ],
+      "modified": [],
+      "removed": []
+    },
+    "contexts": {
+      "added": []
+    },
+    "contracts": [
+      {
+        "context": "prestamos",
+        "path": "spec/contextos/prestamos/api.openapi.json",
+        "from": "1.0.0",
+        "to": "2.0.0",
+        "compatible": false
+      }
+    ],
+    "features": [],
+    "tasksToReview": [],
+    "notApplied": "Los términos del glosario y los esquemas de eventos que trae la propuesta no se aplican: se pasan a spec/ con /diverger-architect:design"
+  }
 }

@@ -1,6 +1,6 @@
 {
   "openapi": "3.1.0",
-  "info": { "title": "Préstamos", "version": "1.0.0" },
+  "info": { "title": "Préstamos", "version": "2.0.0" },
   "servers": [{ "url": "/" }],
   "security": [{ "google": [] }],
   "paths": {
@@ -147,6 +147,52 @@
         }
       }
     },
+    "/api/equipos/{id}/baja": {
+      "post": {
+        "operationId": "prestamos.darDeBajaEquipo",
+        "summary": "Dar de baja un equipo averiado o retirado (Solo IT)",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DarDeBaja" },
+              "example": { "motivo": "Averiado: no enciende" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "El equipo con estado dado de baja y su motivo, sin persona ni devolucion",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Equipo" } } }
+          },
+          "400": {
+            "description": "Falta el motivo de la baja",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "Falta el motivo de la baja" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/SinSesion" },
+          "403": { "$ref": "#/components/responses/SoloIt" },
+          "404": { "$ref": "#/components/responses/NoExiste" },
+          "409": {
+            "description": "El equipo tiene un préstamo activo (reservado o prestado) o ya está dado de baja",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "prestamoActivo": { "value": { "error": "El equipo tiene un préstamo activo" } },
+                  "yaDadoDeBaja": { "value": { "error": "El equipo ya está dado de baja" } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/prestamos/vencidos": {
       "get": {
         "operationId": "prestamos.listarVencidos",
@@ -198,9 +244,10 @@
         "properties": {
           "id": { "type": "string" },
           "nombre": { "type": "string" },
-          "estado": { "type": "string", "enum": ["disponible", "reservado", "prestado"] },
+          "estado": { "type": "string", "enum": ["disponible", "reservado", "prestado", "dado de baja"] },
           "persona": { "type": "string", "description": "El correo de quien lo tiene; solo si está reservado o prestado" },
-          "devolucion": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "Solo si está reservado o prestado" }
+          "devolucion": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "Solo si está reservado o prestado" },
+          "motivo": { "type": "string", "description": "El motivo de la baja; solo si está dado de baja" }
         }
       },
       "Solicitud": {
@@ -213,6 +260,11 @@
           "persona": { "type": "string" },
           "devolucion": { "type": "string" }
         }
+      },
+      "DarDeBaja": {
+        "type": "object",
+        "required": ["motivo"],
+        "properties": { "motivo": { "type": "string", "description": "Texto libre que explica por qué se da de baja el equipo" } }
       },
       "Vencido": {
         "type": "object",
@@ -268,7 +320,7 @@
         }
       },
       "NoDisponible": {
-        "description": "El equipo está reservado o prestado",
+        "description": "El equipo está reservado, prestado o dado de baja",
         "content": {
           "application/json": {
             "schema": { "$ref": "#/components/schemas/Error" },
