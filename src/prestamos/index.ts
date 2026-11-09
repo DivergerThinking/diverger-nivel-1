@@ -2,7 +2,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { OpcionesContexto } from "../../lib/datos.js";
 import { exigirIT } from "../cuentas/index.js";
-import { entregarEquipo, listarEquiposConEstado, solicitarEquipo, type Equipo } from "./prestamo.js";
+import { entregarEquipo, listarEquiposConEstado, prestarEquipo, solicitarEquipo, type Equipo } from "./prestamo.js";
 import type { components } from "./api.gen.js";
 
 export { listarEquiposConEstado, type Equipo } from "./prestamo.js";
@@ -46,5 +46,23 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
       return reply.code(409).send({ error: "El equipo no está reservado" });
     },
   );
+  app.post<{
+    Params: { id: string };
+    Body: components["schemas"]["PrestamoMostrador"] | undefined;
+    Reply: Equipo | ErrorApi;
+  }>("/api/equipos/:id/prestamo", { preHandler: exigirIT }, async (request, reply) => {
+    const resultado = await prestarEquipo(almacen, request.params.id, request.body?.persona, request.body?.devolucion);
+    if (resultado.ok) return reply.code(201).send(resultado.equipo);
+    switch (resultado.error) {
+      case "faltan-datos":
+        return reply.code(400).send({ error: "Faltan la persona o la fecha de devolución" });
+      case "devolucion-no-valida":
+        return reply.code(400).send({ error: "La fecha de devolución no es válida" });
+      case "no-existe":
+        return reply.code(404).send({ error: "No existe el equipo" });
+      case "no-disponible":
+        return reply.code(409).send({ error: "El equipo no está disponible" });
+    }
+  });
   return Promise.resolve();
 };
