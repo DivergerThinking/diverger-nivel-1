@@ -143,6 +143,12 @@ describe("POST /api/equipos/:id/solicitud", () => {
       pedir(id, { devolucion: "2030-06-15" }, "marcos"),
     ]);
     expect([a.statusCode, b.statusCode].sort()).toEqual([201, 409]);
+    const [ganadora, perdedora] = a.statusCode === 201 ? [a, b] : [b, a];
+    expect(perdedora.json()).toEqual({ error: "El equipo no está disponible" });
+    expect(ganadora.json()).toMatchObject({ id, estado: "reservado", devolucion: "2030-06-15" });
+    expect((await estadoDe(id))?.persona).toBe(ganadora.json<{ persona: string }>().persona);
+    expect(await almacen.listar(COLECCION_ACTIVOS)).toHaveLength(1);
+    expect(await almacen.listar(COLECCION_PRESTAMOS)).toHaveLength(1);
   });
 
   it("sin sesión responde 401", async () => {
@@ -299,7 +305,12 @@ describe("POST /api/equipos/:id/prestamo", () => {
       prestar(id, { persona: "marcos.ruiz@empresa.com", devolucion: "2030-06-15" }),
     ]);
     expect([a.statusCode, b.statusCode].sort()).toEqual([201, 409]);
+    const [ganadora, perdedora] = a.statusCode === 201 ? [a, b] : [b, a];
+    expect(perdedora.json()).toEqual({ error: "El equipo no está disponible" });
+    expect((await estadoDe(id))?.persona).toBe(ganadora.json<{ persona: string }>().persona);
+    expect(["reservado", "prestado"]).toContain((await estadoDe(id))?.estado);
     expect(await almacen.listar(COLECCION_ACTIVOS)).toHaveLength(1);
+    expect(await almacen.listar(COLECCION_PRESTAMOS)).toHaveLength(1);
   });
 
   it("un equipo que no existe responde 404 «No existe el equipo»", async () => {
