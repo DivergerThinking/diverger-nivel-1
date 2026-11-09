@@ -1,7 +1,8 @@
 // Interfaz pública del contexto «prestamos»: lo único que pueden importar los demás (ADR 0003).
 import type { FastifyPluginAsync } from "fastify";
 import type { OpcionesContexto } from "../../lib/datos.js";
-import { listarEquiposConEstado, solicitarEquipo, type Equipo } from "./prestamo.js";
+import { exigirIT } from "../cuentas/index.js";
+import { entregarEquipo, listarEquiposConEstado, solicitarEquipo, type Equipo } from "./prestamo.js";
 import type { components } from "./api.gen.js";
 
 export { listarEquiposConEstado, type Equipo } from "./prestamo.js";
@@ -34,5 +35,16 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
         return reply.code(409).send({ error: "El equipo no está disponible" });
     }
   });
+
+  app.post<{ Params: { id: string }; Reply: Equipo | ErrorApi }>(
+    "/api/equipos/:id/entrega",
+    { preHandler: exigirIT },
+    async (request, reply) => {
+      const resultado = await entregarEquipo(almacen, request.params.id);
+      if (resultado.ok) return reply.code(200).send(resultado.equipo);
+      if (resultado.error === "no-existe") return reply.code(404).send({ error: "No existe el equipo" });
+      return reply.code(409).send({ error: "El equipo no está reservado" });
+    },
+  );
   return Promise.resolve();
 };
