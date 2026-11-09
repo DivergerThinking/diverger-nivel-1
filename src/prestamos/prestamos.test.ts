@@ -454,6 +454,82 @@ describe("GET /api/prestamos/vencidos", () => {
   });
 });
 
+const historial = (id: string, token = "it") =>
+  app.inject({ method: "GET", url: `/api/equipos/${id}/historial`, headers: { authorization: `Bearer ${token}` } });
+
+describe("GET /api/equipos/:id/historial", () => {
+  it("lista del más reciente al más antiguo: la reserva vigente primero y el préstamo devuelto después", async () => {
+    const id = await darDeAlta("Proyector 01");
+    await prestar(id, { persona: "ana.perez@empresa.com", devolucion: "2030-05-01" });
+    await devolver(id);
+    await pedir(id, { devolucion: "2030-06-15" });
+
+    const r = await historial(id);
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toEqual([
+      { persona: "lucia.gomez@empresa.com", devolucion: "2030-06-15", estado: "reservado" },
+      { persona: "ana.perez@empresa.com", devolucion: "2030-05-01", estado: "devuelto" },
+    ]);
+  });
+
+  it("ordena por el instante de creación y no mezcla los préstamos de otros equipos", async () => {
+    const id = await darDeAlta("Proyector 01");
+    const otro = await darDeAlta("Monitor 03");
+    await almacen.guardar(COLECCION_PRESTAMOS, "p-1", {
+      equipoId: id,
+      persona: "ana.perez@empresa.com",
+      devolucion: "2030-05-01",
+      estado: "devuelto",
+      creadoEn: "2030-04-01T10:00:00.000Z",
+    });
+    await almacen.guardar(COLECCION_PRESTAMOS, "p-2", {
+      equipoId: id,
+      persona: "marcos.ruiz@empresa.com",
+      devolucion: "2030-06-01",
+      estado: "devuelto",
+      creadoEn: "2030-05-10T10:00:00.000Z",
+    });
+    await almacen.guardar(COLECCION_PRESTAMOS, "p-3", {
+      equipoId: otro,
+      persona: "lucia.gomez@empresa.com",
+      devolucion: "2030-06-01",
+      estado: "prestado",
+      creadoEn: "2030-05-20T10:00:00.000Z",
+    });
+
+    const r = await historial(id);
+    expect(r.json()).toEqual([
+      { persona: "marcos.ruiz@empresa.com", devolucion: "2030-06-01", estado: "devuelto" },
+      { persona: "ana.perez@empresa.com", devolucion: "2030-05-01", estado: "devuelto" },
+    ]);
+  });
+
+  it("un equipo sin préstamos responde 200 con una lista vacía", async () => {
+    const id = await darDeAlta("Portátil 07");
+    const r = await historial(id);
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toEqual([]);
+  });
+
+  it("un equipo que no existe responde 404 «No existe el equipo»", async () => {
+    const r = await historial("no-existe");
+    expect(r.statusCode).toBe(404);
+    expect(r.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("una cuenta que no es de IT responde 403 «Solo IT puede hacer esto.»", async () => {
+    const id = await darDeAlta("Portátil 07");
+    const r = await historial(id, "lucia");
+    expect(r.statusCode).toBe(403);
+    expect(r.json()).toEqual({ error: "Solo IT puede hacer esto." });
+  });
+
+  it("sin sesión responde 401", async () => {
+    const r = await app.inject({ method: "GET", url: "/api/equipos/x/historial" });
+    expect(r.statusCode).toBe(401);
+  });
+});
+
 describe("GET /api/equipos", () => {
   it("una empleada ve «Portátil 07» disponible sin persona ni devolución y «Proyector 01» prestado con persona y devolución", async () => {
     const portatil = await darDeAlta("Portátil 07");

@@ -3,6 +3,7 @@ import type { FastifyPluginAsync } from "fastify";
 import type { OpcionesContexto } from "../../lib/datos.js";
 import { exigirIT } from "../cuentas/index.js";
 import {
+  consultarHistorial,
   devolverEquipo,
   entregarEquipo,
   listarEquiposConEstado,
@@ -10,11 +11,19 @@ import {
   prestarEquipo,
   solicitarEquipo,
   type Equipo,
+  type EntradaHistorial,
   type Vencido,
 } from "./prestamo.js";
 import type { components } from "./api.gen.js";
 
-export { listarEquiposConEstado, listarVencidos, type Equipo, type Vencido } from "./prestamo.js";
+export {
+  consultarHistorial,
+  listarEquiposConEstado,
+  listarVencidos,
+  type EntradaHistorial,
+  type Equipo,
+  type Vencido,
+} from "./prestamo.js";
 
 type ErrorApi = components["schemas"]["Error"];
 
@@ -87,6 +96,16 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
 
   app.get<{ Reply: Vencido[] }>("/api/prestamos/vencidos", { preHandler: exigirIT }, async () =>
     listarVencidos(almacen),
+  );
+
+  app.get<{ Params: { id: string }; Reply: EntradaHistorial[] | ErrorApi }>(
+    "/api/equipos/:id/historial",
+    { preHandler: exigirIT },
+    async (request, reply) => {
+      const resultado = await consultarHistorial(almacen, request.params.id);
+      if (resultado.ok) return reply.code(200).send(resultado.historial);
+      return reply.code(404).send({ error: "No existe el equipo" });
+    },
   );
   return Promise.resolve();
 };
