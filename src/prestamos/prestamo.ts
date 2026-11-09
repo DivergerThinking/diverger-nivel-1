@@ -178,6 +178,33 @@ export async function listarVencidos(almacen: Almacen, ahora: Date = new Date())
   return vencidos.sort((a, b) => a.devolucion.localeCompare(b.devolucion));
 }
 
+export type EntradaHistorial = components["schemas"]["EntradaHistorial"];
+
+interface DocumentoPrestamo {
+  equipoId: string;
+  persona: string;
+  devolucion: string;
+  estado: EntradaHistorial["estado"];
+  creadoEn: string;
+}
+
+export type ResultadoHistorial = { ok: true; historial: EntradaHistorial[] } | { ok: false; error: "no-existe" };
+
+/** Préstamos de un equipo, del más reciente al más antiguo; si coinciden en el instante, el vigente va antes. */
+export async function consultarHistorial(almacen: Almacen, equipoId: string): Promise<ResultadoHistorial> {
+  const equipo = await obtenerEquipo(almacen, equipoId);
+  if (!equipo) return { ok: false, error: "no-existe" };
+  const prestamos = (await almacen.listar<DocumentoPrestamo>(COLECCION_PRESTAMOS)).filter(
+    (p) => p.equipoId === equipoId,
+  );
+  const vigente = (p: DocumentoPrestamo) => (p.estado === "devuelto" ? 0 : 1);
+  prestamos.sort((a, b) => b.creadoEn.localeCompare(a.creadoEn) || vigente(b) - vigente(a));
+  return {
+    ok: true,
+    historial: prestamos.map(({ persona, devolucion, estado }) => ({ persona, devolucion, estado })),
+  };
+}
+
 /** Todos los equipos con su estado; con persona y devolución solo si están reservados o prestados. */
 export async function listarEquiposConEstado(almacen: Almacen): Promise<Equipo[]> {
   const equipos = await listarEquipos(almacen);
