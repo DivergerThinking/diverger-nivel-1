@@ -1,0 +1,1069 @@
+{
+  "schemaVersion": 1,
+  "initiative": {
+    "id": "prestamo-de-equipos-de-it",
+    "title": "Préstamo de equipos de IT",
+    "vision": "Que empleados e IT gestionen el préstamo de los equipos de la oficina en una aplicación, sabiendo qué está libre y sin que ningún equipo se reserve o se preste dos veces.",
+    "language": "es",
+    "summary": "Hoy los préstamos de portátiles, monitores y proyectores se apuntan en una hoja de cálculo y se piden por correo a IT: nadie sabe qué está libre sin preguntar, dos personas acaban esperando el mismo portátil y los préstamos vencidos pasan desapercibidos hasta que alguien echa en falta el equipo.\n\nLa aplicación permite a los empleados ver los equipos y pedir uno libre, y a IT dar de alta equipos, entregarlos, prestarlos en el mostrador, apuntar las devoluciones, ver los vencidos y consultar el historial. El inventario de IT se conecta a una API fijada por el cliente que no puede cambiar. Quedan fuera la anulación de solicitudes y los avisos por correo de préstamos vencidos.",
+    "requirements": [
+      {
+        "id": "RQ.001",
+        "title": "Entrar en la aplicación con la cuenta de Google de la empresa",
+        "type": "Funcional",
+        "source": "peticion.md"
+      },
+      {
+        "id": "RQ.002",
+        "title": "Ver la lista de equipos con su estado y, si está reservado o prestado, la persona y la devolución",
+        "type": "Funcional",
+        "source": "peticion.md"
+      },
+      {
+        "id": "RQ.003",
+        "title": "Pedir un equipo libre con la fecha de devolución, que queda reservado a nombre de quien lo pide",
+        "type": "Funcional",
+        "source": "peticion.md"
+      },
+      {
+        "id": "RQ.004",
+        "title": "Solo IT: dar de alta un equipo con nombre obligatorio y que no se repita",
+        "type": "Funcional",
+        "source": "peticion.md"
+      },
+      {
+        "id": "RQ.005",
+        "title": "Solo IT: entregar un equipo reservado, que pasa a prestado",
+        "type": "Funcional",
+        "source": "peticion.md"
+      },
+      {
+        "id": "RQ.006",
+        "title": "Solo IT: prestar en el mostrador un equipo disponible a la persona indicada",
+        "type": "Funcional",
+        "source": "peticion.md"
+      },
+      {
+        "id": "RQ.007",
+        "title": "Solo IT: apuntar la devolución de un equipo prestado",
+        "type": "Funcional",
+        "source": "peticion.md"
+      },
+      {
+        "id": "RQ.008",
+        "title": "Solo IT: ver los préstamos vencidos, del más antiguo al más reciente",
+        "type": "Funcional",
+        "source": "peticion.md"
+      },
+      {
+        "id": "RQ.009",
+        "title": "Solo IT: ver el historial de un equipo, del más reciente al más antiguo",
+        "type": "Funcional",
+        "source": "peticion.md"
+      },
+      {
+        "id": "RQ.010",
+        "title": "La fecha de devolución es AAAA-MM-DD real; quien pide no puede poner una fecha pasada, IT en el mostrador sí; hoy es el día en Madrid",
+        "type": "Funcional",
+        "source": "peticion.md"
+      },
+      {
+        "id": "RQ.011",
+        "title": "Dos nombres de equipo son el mismo si solo cambian mayúsculas o espacios al principio o al final",
+        "type": "Funcional",
+        "source": "peticion.md"
+      },
+      {
+        "id": "RQ.012",
+        "title": "Todas las rutas exigen el token de identidad de Google con correo verificado; las cuentas de IT salen de CORREOS_IT y el resto recibe 403",
+        "type": "No funcional: seguridad",
+        "source": "peticion.md"
+      },
+      {
+        "id": "RQ.013",
+        "title": "Un equipo nunca se reserva o se presta dos veces a la vez, ni con peticiones simultáneas",
+        "type": "No funcional: concurrencia",
+        "source": "peticion.md"
+      },
+      {
+        "id": "RQ.014",
+        "title": "La API es exactamente la del anexo, con errores {\"error\": \"<mensaje>\"}",
+        "type": "No funcional: compatibilidad",
+        "source": "peticion.md"
+      }
+    ],
+    "delivery": {
+      "mode": "manual"
+    },
+    "conventions": {
+      "areas": {
+        "ACC": "Acceso y permisos",
+        "EQU": "Equipos",
+        "SOL": "Solicitudes de equipos",
+        "PRE": "Préstamos y devoluciones",
+        "SEG": "Seguimiento de préstamos"
+      }
+    }
+  },
+  "epics": [
+    {
+      "id": "EP-01",
+      "title": "Acceso y permisos",
+      "description": "Empleados, IT y el inventario de IT entran con su cuenta de Google de la empresa, y solo las cuentas de IT pueden hacer lo que les toca a ellas. Deja fuera cualquier otro método de acceso."
+    },
+    {
+      "id": "EP-02",
+      "title": "Equipos",
+      "description": "IT da de alta los equipos de la oficina y cualquier empleado ve la lista con su estado. Deja fuera cambiar o retirar un equipo, que la petición no pide."
+    },
+    {
+      "id": "EP-03",
+      "title": "Solicitudes de equipos",
+      "description": "Un empleado pide un equipo libre con la fecha en que lo devolverá y el equipo queda reservado a su nombre, sin que dos personas se queden con el mismo. Deja fuera que el empleado anule su solicitud."
+    },
+    {
+      "id": "EP-04",
+      "title": "Préstamos y devoluciones",
+      "description": "IT entrega los equipos reservados, presta directamente en el mostrador y apunta las devoluciones. Las solicitudes de los empleados son de la épica «Solicitudes de equipos»."
+    },
+    {
+      "id": "EP-05",
+      "title": "Seguimiento de préstamos",
+      "description": "IT ve qué préstamos han vencido y consulta el historial de cada equipo, sin preguntar a nadie. Deja fuera los avisos por correo de préstamos vencidos."
+    }
+  ],
+  "stories": [
+    {
+      "id": "HU-ACC-01",
+      "epic": "EP-01",
+      "kind": "story",
+      "title": "Entrar con la cuenta de Google de la empresa",
+      "role": "empleado",
+      "goal": "entrar en la aplicación con mi cuenta de Google de la empresa",
+      "benefit": "que cada reserva y cada préstamo queden a mi nombre sin crear otra contraseña",
+      "requirements": [
+        "RQ.001",
+        "RQ.012",
+        "RQ.014"
+      ],
+      "context": "Todos los usuarios entran con su cuenta de Google de la empresa, y todas las rutas de la API exigen el token de identidad de Google con el correo verificado, emitido para el cliente OAuth de la aplicación (RQ.001, RQ.012; peticion.md y su anexo).",
+      "notes": "La persona de cada operación es el correo del token. El inventario de IT entra igual, con una cuenta de servicio. Los criterios se comprueban con la ruta de la lista de equipos, que puede existir antes de que la lista esté terminada.",
+      "acceptanceCriteria": [
+        {
+          "type": "positive",
+          "given": "la empleada «lucia.gomez@empresa.com» con un token de identidad de Google válido, con el correo verificado y emitido para el cliente OAuth de la aplicación",
+          "when": "pide la lista de equipos",
+          "then": "recibe 200 con la lista de equipos"
+        },
+        {
+          "type": "positive",
+          "given": "la cuenta de servicio del inventario de IT con un token de identidad de Google válido, con el correo verificado y emitido para el cliente OAuth de la aplicación",
+          "when": "pide la lista de equipos",
+          "then": "recibe 200 con la lista de equipos"
+        },
+        {
+          "type": "negative",
+          "given": "una petición sin token de identidad",
+          "when": "pide la lista de equipos",
+          "then": "recibe 401 con {\"error\": \"Inicia sesión con Google.\"}"
+        },
+        {
+          "type": "negative",
+          "given": "un token de identidad de Google emitido para otro cliente OAuth",
+          "when": "pide la lista de equipos",
+          "then": "recibe 401 con {\"error\": \"Inicia sesión con Google.\"}"
+        },
+        {
+          "type": "negative",
+          "given": "un token de identidad de Google emitido para el cliente OAuth de la aplicación con el correo sin verificar",
+          "when": "pide la lista de equipos",
+          "then": "recibe 401 con {\"error\": \"Inicia sesión con Google.\"}"
+        }
+      ],
+      "definitionOfDone": "Criterios de aceptación probados.\nLos errores siguen el formato {\"error\": \"<mensaje>\"} del anexo.\nTextos revisados en español de España.",
+      "externalDependencies": [
+        "Cliente OAuth de Google de la aplicación"
+      ],
+      "priority": "must",
+      "estimate": {
+        "size": "L",
+        "hours": 8
+      },
+      "storyPoints": 5,
+      "status": "published",
+      "sprint": "SP-01",
+      "assignee": "P-01",
+      "blockedBy": [],
+      "readiness": {
+        "state": "partial",
+        "pending": "DoR-08: dependencias externas sin plan confirmado: Cliente OAuth de Google de la aplicación · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09"
+      }
+    },
+    {
+      "id": "HU-ACC-02",
+      "epic": "EP-01",
+      "kind": "story",
+      "title": "Reservar a IT las operaciones de IT",
+      "role": "técnico de IT",
+      "goal": "limitar las operaciones «Solo IT» a las cuentas de CORREOS_IT",
+      "benefit": "evitar que un empleado entregue o dé por devuelto un equipo ajeno",
+      "requirements": [
+        "RQ.012"
+      ],
+      "context": "Las operaciones «Solo IT» solo las hace una cuenta de la variable de entorno CORREOS_IT, fijada en la configuración del despliegue y no en el código; con cualquier otra cuenta responden 403 (RQ.012; peticion.md, anexo). Responde al riesgo de que un empleado haga lo que solo le toca a IT.",
+      "notes": "Dos correos son el mismo aunque cambien las mayúsculas. La cuenta de servicio del inventario está en la lista y también puede hacer lo de un empleado.",
+      "acceptanceCriteria": [
+        {
+          "type": "positive",
+          "given": "CORREOS_IT con «it.soporte@empresa.com,inventario@empresa.iam.gserviceaccount.com» y una sesión de «IT.Soporte@empresa.com»",
+          "when": "da de alta el equipo «Monitor 03»",
+          "then": "recibe 201 con el equipo «Monitor 03» en estado «disponible»"
+        },
+        {
+          "type": "negative",
+          "given": "CORREOS_IT con «it.soporte@empresa.com» y una sesión de la empleada «lucia.gomez@empresa.com»",
+          "when": "da de alta el equipo «Monitor 03»",
+          "then": "recibe 403 con {\"error\": \"Solo IT puede hacer esto.\"} y el equipo no se crea"
+        },
+        {
+          "type": "negative",
+          "given": "CORREOS_IT con «it.soporte@empresa.com» y una sesión de la empleada «lucia.gomez@empresa.com»",
+          "when": "pide los préstamos vencidos",
+          "then": "recibe 403 con {\"error\": \"Solo IT puede hacer esto.\"}"
+        },
+        {
+          "type": "positive",
+          "given": "CORREOS_IT con «inventario@empresa.iam.gserviceaccount.com», una sesión de esa cuenta y el equipo «Portátil 07» disponible",
+          "when": "pide el equipo «Portátil 07» con la devolución «2030-06-15»",
+          "then": "recibe 201 con el equipo en estado «reservado» y la persona «inventario@empresa.iam.gserviceaccount.com»"
+        }
+      ],
+      "definitionOfDone": "Criterios de aceptación probados.\nLa lista de IT se lee de la variable de entorno CORREOS_IT, sin correos en el código.\nTextos revisados en español de España.",
+      "priority": "must",
+      "estimate": {
+        "size": "M",
+        "hours": 4
+      },
+      "storyPoints": 3,
+      "status": "published",
+      "sprint": "SP-01",
+      "assignee": "P-01",
+      "blockedBy": [
+        "HU-ACC-01"
+      ],
+      "blockedByReasons": {
+        "HU-ACC-01": "Saber si la cuenta es de IT exige conocer el correo del token."
+      },
+      "readiness": {
+        "state": "partial",
+        "pending": "DoR-08: depende de HU-ACC-01, sin resolver ni planificada en un sprint anterior · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09"
+      }
+    },
+    {
+      "id": "HU-EQU-01",
+      "epic": "EP-02",
+      "kind": "story",
+      "title": "Dar de alta un equipo",
+      "role": "técnico de IT",
+      "goal": "dar de alta un equipo con su nombre",
+      "benefit": "que los empleados puedan pedirlo sin escribir a IT",
+      "requirements": [
+        "RQ.004",
+        "RQ.011",
+        "RQ.014"
+      ],
+      "context": "IT da de alta los equipos de la oficina; el nombre es obligatorio y no se puede repetir, y dos nombres son el mismo si solo cambian mayúsculas o espacios al principio o al final (RQ.004, RQ.011; peticion.md, anexo).",
+      "acceptanceCriteria": [
+        {
+          "type": "positive",
+          "given": "el técnico de IT «it.soporte@empresa.com» y ningún equipo llamado «Portátil 07»",
+          "when": "da de alta el equipo con el nombre «Portátil 07»",
+          "then": "recibe 201 con el id del equipo, el nombre «Portátil 07» y el estado «disponible»"
+        },
+        {
+          "type": "negative",
+          "given": "el técnico de IT «it.soporte@empresa.com»",
+          "when": "da de alta un equipo con el nombre vacío",
+          "then": "recibe 400 con {\"error\": \"Falta el nombre del equipo\"} y no se crea ningún equipo"
+        },
+        {
+          "type": "negative",
+          "given": "el técnico de IT «it.soporte@empresa.com» y el equipo «Portátil 07» ya dado de alta",
+          "when": "da de alta un equipo con el nombre « portátil 07 »",
+          "then": "recibe 409 con {\"error\": \"Ya hay un equipo con ese nombre\"} y no se crea otro equipo"
+        }
+      ],
+      "definitionOfDone": "Criterios de aceptación probados.\nRespuesta y errores exactamente como en el anexo.\nTextos revisados en español de España.",
+      "priority": "must",
+      "estimate": {
+        "size": "M",
+        "hours": 4
+      },
+      "storyPoints": 3,
+      "status": "published",
+      "sprint": "SP-01",
+      "assignee": "P-01",
+      "blockedBy": [
+        "HU-ACC-02"
+      ],
+      "blockedByReasons": {
+        "HU-ACC-02": "Dar de alta es una operación «Solo IT»."
+      },
+      "readiness": {
+        "state": "partial",
+        "pending": "DoR-08: depende de HU-ACC-02, sin resolver ni planificada en un sprint anterior · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09"
+      }
+    },
+    {
+      "id": "HU-EQU-02",
+      "epic": "EP-02",
+      "kind": "story",
+      "title": "Ver los equipos y su estado",
+      "role": "empleado",
+      "goal": "ver la lista de equipos con su estado",
+      "benefit": "saber qué está libre sin preguntar a IT",
+      "requirements": [
+        "RQ.002",
+        "RQ.014"
+      ],
+      "context": "Cualquier empleado ve los equipos y su estado; si un equipo está reservado o prestado, la lista muestra también la persona y la fecha de devolución (RQ.002; peticion.md, anexo).",
+      "notes": "Depende de la pregunta abierta sobre si todos los empleados deben ver el correo de quien tiene cada equipo.",
+      "acceptanceCriteria": [
+        {
+          "type": "positive",
+          "given": "el equipo «Portátil 07» disponible y el equipo «Proyector 01» prestado a «ana.perez@empresa.com» hasta «2030-06-15»",
+          "when": "la empleada «lucia.gomez@empresa.com» pide la lista de equipos",
+          "then": "recibe 200 con «Portátil 07» en estado «disponible» sin persona ni devolución, y «Proyector 01» en estado «prestado» con la persona «ana.perez@empresa.com» y la devolución «2030-06-15»"
+        },
+        {
+          "type": "negative",
+          "given": "ningún equipo dado de alta",
+          "when": "la empleada «lucia.gomez@empresa.com» pide la lista de equipos",
+          "then": "recibe 200 con una lista vacía"
+        }
+      ],
+      "definitionOfDone": "Criterios de aceptación probados.\nCampos de la respuesta exactamente como en el anexo.\nTextos revisados en español de España.",
+      "priority": "must",
+      "estimate": {
+        "size": "S",
+        "hours": 2
+      },
+      "storyPoints": 2,
+      "status": "published",
+      "sprint": "SP-01",
+      "assignee": "P-01",
+      "blockedBy": [
+        "HU-EQU-01"
+      ],
+      "blockedByReasons": {
+        "HU-EQU-01": "La lista muestra los equipos dados de alta."
+      },
+      "readiness": {
+        "state": "partial",
+        "pending": "DoR-08: depende de HU-EQU-01, sin resolver ni planificada en un sprint anterior · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09"
+      }
+    },
+    {
+      "id": "HU-SOL-01",
+      "epic": "EP-03",
+      "kind": "story",
+      "title": "Pedir un equipo libre",
+      "role": "empleado",
+      "goal": "pedir un equipo disponible con la fecha en que lo devolveré",
+      "benefit": "tenerlo reservado a mi nombre hasta que IT me lo entregue, sin escribir correos",
+      "requirements": [
+        "RQ.003",
+        "RQ.010",
+        "RQ.014"
+      ],
+      "context": "Un empleado pide un equipo libre con la fecha de devolución y el equipo queda reservado a su nombre hasta que IT se lo entrega. La fecha va como AAAA-MM-DD, tiene que existir y no puede ser anterior a hoy, que es el día en Madrid (RQ.003, RQ.010; peticion.md, anexo).",
+      "notes": "Depende de la pregunta abierta sobre qué pasa con una reserva que IT no llega a entregar, porque los empleados no pueden anular solicitudes.",
+      "acceptanceCriteria": [
+        {
+          "type": "positive",
+          "given": "el equipo «Portátil 07» disponible",
+          "when": "la empleada «lucia.gomez@empresa.com» lo pide con la devolución «2030-06-15»",
+          "then": "recibe 201 con el equipo en estado «reservado», la persona «lucia.gomez@empresa.com» y la devolución «2030-06-15»"
+        },
+        {
+          "type": "negative",
+          "given": "el equipo «Portátil 07» disponible",
+          "when": "la empleada «lucia.gomez@empresa.com» lo pide sin fecha de devolución",
+          "then": "recibe 400 con {\"error\": \"Falta la fecha de devolución\"} y el equipo sigue disponible"
+        },
+        {
+          "type": "negative",
+          "given": "el equipo «Portátil 07» disponible",
+          "when": "la empleada «lucia.gomez@empresa.com» lo pide con la devolución «2026-02-30»",
+          "then": "recibe 400 con {\"error\": \"La fecha de devolución no es válida\"} y el equipo sigue disponible"
+        },
+        {
+          "type": "negative",
+          "given": "el equipo «Portátil 07» disponible",
+          "when": "la empleada «lucia.gomez@empresa.com» lo pide con la devolución «2025-01-10», anterior a hoy en Madrid",
+          "then": "recibe 400 con {\"error\": \"La fecha de devolución ya ha pasado\"} y el equipo sigue disponible"
+        },
+        {
+          "type": "negative",
+          "given": "ningún equipo con el id «no-existe»",
+          "when": "la empleada «lucia.gomez@empresa.com» pide el equipo «no-existe» con la devolución «2030-06-15»",
+          "then": "recibe 404 con {\"error\": \"No existe el equipo\"}"
+        },
+        {
+          "type": "negative",
+          "given": "el equipo «Portátil 07» reservado a «lucia.gomez@empresa.com»",
+          "when": "el empleado «marcos.ruiz@empresa.com» lo pide con la devolución «2030-06-15»",
+          "then": "recibe 409 con {\"error\": \"El equipo no está disponible\"} y el equipo sigue reservado a «lucia.gomez@empresa.com»"
+        }
+      ],
+      "definitionOfDone": "Criterios de aceptación probados.\n«Hoy» se calcula con el día en Madrid.\nRespuesta y errores exactamente como en el anexo.",
+      "priority": "must",
+      "estimate": {
+        "size": "L",
+        "hours": 8
+      },
+      "storyPoints": 5,
+      "status": "published",
+      "sprint": "SP-01",
+      "assignee": "P-01",
+      "blockedBy": [
+        "HU-EQU-01"
+      ],
+      "blockedByReasons": {
+        "HU-EQU-01": "Solo se pide un equipo dado de alta."
+      },
+      "readiness": {
+        "state": "partial",
+        "pending": "DoR-08: depende de HU-EQU-01, sin resolver ni planificada en un sprint anterior · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09"
+      }
+    },
+    {
+      "id": "HU-SOL-02",
+      "epic": "EP-03",
+      "kind": "story",
+      "title": "Evitar que dos personas se queden el mismo equipo",
+      "role": "empleado",
+      "goal": "pedir un equipo libre aunque otra persona lo pida a la vez",
+      "benefit": "saber con certeza si el equipo es mío, sin esperar un portátil que ya tiene otra persona",
+      "requirements": [
+        "RQ.013"
+      ],
+      "context": "Lo más importante de la petición: un equipo no puede estar reservado o prestado dos veces a la vez, ni siquiera con dos peticiones simultáneas, sean solicitudes o préstamos en el mostrador (RQ.013; peticion.md, anexo).",
+      "acceptanceCriteria": [
+        {
+          "type": "positive",
+          "given": "el equipo «Portátil 07» disponible y dos peticiones simultáneas, una de «lucia.gomez@empresa.com» y otra de «marcos.ruiz@empresa.com», con la devolución «2030-06-15»",
+          "when": "llegan las dos solicitudes a la vez",
+          "then": "una recibe 201 con el equipo reservado a su nombre y la otra recibe 409 con {\"error\": \"El equipo no está disponible\"}"
+        },
+        {
+          "type": "negative",
+          "given": "el equipo «Portátil 07» disponible, una solicitud de «lucia.gomez@empresa.com» y un préstamo en el mostrador de «it.soporte@empresa.com» a «marcos.ruiz@empresa.com», ambos con la devolución «2030-06-15»",
+          "when": "llegan las dos peticiones a la vez",
+          "then": "exactamente una de las dos recibe 201 y la otra recibe 409 con {\"error\": \"El equipo no está disponible\"}, y el equipo queda reservado o prestado a una sola persona"
+        }
+      ],
+      "definitionOfDone": "Criterios de aceptación probados, también con peticiones simultáneas.\nNunca salen bien dos peticiones sobre el mismo equipo disponible.",
+      "priority": "must",
+      "estimate": {
+        "size": "L",
+        "hours": 8
+      },
+      "storyPoints": 5,
+      "status": "published",
+      "sprint": "SP-01",
+      "assignee": "P-01",
+      "blockedBy": [
+        "HU-SOL-01",
+        "HU-PRE-02"
+      ],
+      "blockedByReasons": {
+        "HU-SOL-01": "Protege las solicitudes de los empleados.",
+        "HU-PRE-02": "Protege también los préstamos en el mostrador."
+      },
+      "readiness": {
+        "state": "partial",
+        "pending": "DoR-08: depende de HU-SOL-01, HU-PRE-02, sin resolver ni planificada en un sprint anterior · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09"
+      }
+    },
+    {
+      "id": "HU-PRE-01",
+      "epic": "EP-04",
+      "kind": "story",
+      "title": "Entregar un equipo reservado",
+      "role": "técnico de IT",
+      "goal": "entregar al empleado el equipo que tiene reservado",
+      "benefit": "que el préstamo conste con la misma persona y fecha que pidió",
+      "requirements": [
+        "RQ.005",
+        "RQ.014"
+      ],
+      "context": "IT entrega los equipos reservados, que pasan a prestados con la misma persona y fecha de devolución de la solicitud (RQ.005; peticion.md, anexo).",
+      "acceptanceCriteria": [
+        {
+          "type": "positive",
+          "given": "el equipo «Portátil 07» reservado a «lucia.gomez@empresa.com» con la devolución «2030-06-15»",
+          "when": "el técnico de IT «it.soporte@empresa.com» lo entrega",
+          "then": "recibe 200 con el equipo en estado «prestado», la persona «lucia.gomez@empresa.com» y la devolución «2030-06-15»"
+        },
+        {
+          "type": "negative",
+          "given": "el equipo «Portátil 07» disponible",
+          "when": "el técnico de IT «it.soporte@empresa.com» lo entrega",
+          "then": "recibe 409 con {\"error\": \"El equipo no está reservado\"} y el equipo sigue disponible"
+        },
+        {
+          "type": "negative",
+          "given": "ningún equipo con el id «no-existe»",
+          "when": "el técnico de IT «it.soporte@empresa.com» entrega el equipo «no-existe»",
+          "then": "recibe 404 con {\"error\": \"No existe el equipo\"}"
+        }
+      ],
+      "definitionOfDone": "Criterios de aceptación probados.\nRespuesta y errores exactamente como en el anexo.",
+      "priority": "must",
+      "estimate": {
+        "size": "M",
+        "hours": 4
+      },
+      "storyPoints": 3,
+      "status": "published",
+      "sprint": "SP-01",
+      "assignee": "P-01",
+      "blockedBy": [
+        "HU-SOL-01"
+      ],
+      "blockedByReasons": {
+        "HU-SOL-01": "Solo se entrega un equipo reservado."
+      },
+      "readiness": {
+        "state": "partial",
+        "pending": "DoR-08: depende de HU-SOL-01, sin resolver ni planificada en un sprint anterior · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09"
+      }
+    },
+    {
+      "id": "HU-PRE-02",
+      "epic": "EP-04",
+      "kind": "story",
+      "title": "Prestar un equipo en el mostrador",
+      "role": "técnico de IT",
+      "goal": "prestar un equipo disponible a quien viene al mostrador, con su fecha de devolución",
+      "benefit": "que también los préstamos sin solicitud pasen por la aplicación",
+      "requirements": [
+        "RQ.006",
+        "RQ.010",
+        "RQ.014"
+      ],
+      "context": "IT presta directamente a quien viene al mostrador. A diferencia de quien pide un equipo, IT puede poner una fecha anterior a hoy porque a veces apunta los préstamos con retraso, y ese préstamo ya aparece entre los vencidos (RQ.006, RQ.010; peticion.md, anexo).",
+      "acceptanceCriteria": [
+        {
+          "type": "positive",
+          "given": "el equipo «Proyector 01» disponible",
+          "when": "el técnico de IT «it.soporte@empresa.com» lo presta a «ana.perez@empresa.com» con la devolución «2030-06-15»",
+          "then": "recibe 201 con el equipo en estado «prestado», la persona «ana.perez@empresa.com» y la devolución «2030-06-15»"
+        },
+        {
+          "type": "positive",
+          "given": "el equipo «Proyector 01» disponible",
+          "when": "el técnico de IT «it.soporte@empresa.com» lo presta a «ana.perez@empresa.com» con la devolución «2025-01-10», anterior a hoy en Madrid",
+          "then": "recibe 201 con el equipo en estado «prestado» y el préstamo aparece entre los vencidos"
+        },
+        {
+          "type": "negative",
+          "given": "el equipo «Proyector 01» disponible",
+          "when": "el técnico de IT «it.soporte@empresa.com» lo presta con la devolución «2030-06-15» y sin persona",
+          "then": "recibe 400 con {\"error\": \"Faltan la persona o la fecha de devolución\"} y el equipo sigue disponible"
+        },
+        {
+          "type": "negative",
+          "given": "el equipo «Proyector 01» disponible",
+          "when": "el técnico de IT «it.soporte@empresa.com» lo presta a «ana.perez@empresa.com» con la devolución «2026-02-30»",
+          "then": "recibe 400 con {\"error\": \"La fecha de devolución no es válida\"} y el equipo sigue disponible"
+        },
+        {
+          "type": "negative",
+          "given": "el equipo «Proyector 01» prestado a «marcos.ruiz@empresa.com»",
+          "when": "el técnico de IT «it.soporte@empresa.com» lo presta a «ana.perez@empresa.com» con la devolución «2030-06-15»",
+          "then": "recibe 409 con {\"error\": \"El equipo no está disponible\"} y el equipo sigue prestado a «marcos.ruiz@empresa.com»"
+        }
+      ],
+      "definitionOfDone": "Criterios de aceptación probados.\nRespuesta y errores exactamente como en el anexo.",
+      "priority": "must",
+      "estimate": {
+        "size": "M",
+        "hours": 4
+      },
+      "storyPoints": 3,
+      "status": "published",
+      "sprint": "SP-01",
+      "assignee": "P-01",
+      "blockedBy": [
+        "HU-EQU-01"
+      ],
+      "blockedByReasons": {
+        "HU-EQU-01": "Solo se presta un equipo dado de alta."
+      },
+      "readiness": {
+        "state": "partial",
+        "pending": "DoR-08: depende de HU-EQU-01, sin resolver ni planificada en un sprint anterior · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09"
+      }
+    },
+    {
+      "id": "HU-PRE-03",
+      "epic": "EP-04",
+      "kind": "story",
+      "title": "Apuntar la devolución de un equipo",
+      "role": "técnico de IT",
+      "goal": "apuntar que un equipo prestado se ha devuelto",
+      "benefit": "que vuelva a aparecer libre para el siguiente empleado",
+      "requirements": [
+        "RQ.007",
+        "RQ.014"
+      ],
+      "context": "IT apunta las devoluciones; el equipo pasa a disponible y deja de llevar persona y fecha de devolución (RQ.007; peticion.md, anexo).",
+      "acceptanceCriteria": [
+        {
+          "type": "positive",
+          "given": "el equipo «Proyector 01» prestado a «ana.perez@empresa.com» con la devolución «2030-06-15»",
+          "when": "el técnico de IT «it.soporte@empresa.com» apunta su devolución",
+          "then": "recibe 200 con el equipo en estado «disponible», sin persona ni devolución"
+        },
+        {
+          "type": "negative",
+          "given": "el equipo «Portátil 07» reservado a «lucia.gomez@empresa.com»",
+          "when": "el técnico de IT «it.soporte@empresa.com» apunta su devolución",
+          "then": "recibe 409 con {\"error\": \"El equipo no está prestado\"} y el equipo sigue reservado"
+        },
+        {
+          "type": "negative",
+          "given": "ningún equipo con el id «no-existe»",
+          "when": "el técnico de IT «it.soporte@empresa.com» apunta la devolución del equipo «no-existe»",
+          "then": "recibe 404 con {\"error\": \"No existe el equipo\"}"
+        }
+      ],
+      "definitionOfDone": "Criterios de aceptación probados.\nRespuesta y errores exactamente como en el anexo.",
+      "priority": "must",
+      "estimate": {
+        "size": "M",
+        "hours": 4
+      },
+      "storyPoints": 3,
+      "status": "published",
+      "sprint": "SP-01",
+      "assignee": "P-01",
+      "blockedBy": [
+        "HU-PRE-02"
+      ],
+      "blockedByReasons": {
+        "HU-PRE-02": "Solo se devuelve un equipo prestado."
+      },
+      "readiness": {
+        "state": "partial",
+        "pending": "DoR-08: depende de HU-PRE-02, sin resolver ni planificada en un sprint anterior · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09"
+      }
+    },
+    {
+      "id": "HU-SEG-01",
+      "epic": "EP-05",
+      "kind": "story",
+      "title": "Ver los préstamos vencidos",
+      "role": "técnico de IT",
+      "goal": "ver los préstamos cuya fecha de devolución es anterior a hoy",
+      "benefit": "revisarlos cada semana sin tener que preguntar a nadie",
+      "requirements": [
+        "RQ.008",
+        "RQ.010",
+        "RQ.014"
+      ],
+      "context": "IT ve qué préstamos han vencido: los equipos prestados con la devolución anterior a hoy, que es el día en Madrid, del más antiguo al más reciente (RQ.008, RQ.010; peticion.md, anexo). Es una de las métricas de éxito.",
+      "acceptanceCriteria": [
+        {
+          "type": "positive",
+          "given": "el equipo «Proyector 01» prestado a «ana.perez@empresa.com» hasta «2025-03-01», el equipo «Monitor 03» prestado a «marcos.ruiz@empresa.com» hasta «2025-01-10» y el equipo «Portátil 07» prestado a «lucia.gomez@empresa.com» hasta «2030-06-15»",
+          "when": "el técnico de IT «it.soporte@empresa.com» pide los préstamos vencidos",
+          "then": "recibe 200 con «Monitor 03» primero y «Proyector 01» después, cada uno con id, nombre, persona y devolución, y sin «Portátil 07»"
+        },
+        {
+          "type": "negative",
+          "given": "el equipo «Portátil 07» reservado a «lucia.gomez@empresa.com» hasta «2025-01-10» y ningún equipo prestado",
+          "when": "el técnico de IT «it.soporte@empresa.com» pide los préstamos vencidos",
+          "then": "recibe 200 con una lista vacía"
+        }
+      ],
+      "definitionOfDone": "Criterios de aceptación probados.\n«Hoy» se calcula con el día en Madrid.\nRespuesta exactamente como en el anexo.",
+      "priority": "must",
+      "estimate": {
+        "size": "M",
+        "hours": 4
+      },
+      "storyPoints": 3,
+      "status": "published",
+      "sprint": "SP-01",
+      "assignee": "P-01",
+      "blockedBy": [
+        "HU-PRE-02"
+      ],
+      "blockedByReasons": {
+        "HU-PRE-02": "Los vencidos son equipos prestados."
+      },
+      "readiness": {
+        "state": "partial",
+        "pending": "DoR-08: depende de HU-PRE-02, sin resolver ni planificada en un sprint anterior · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09"
+      }
+    },
+    {
+      "id": "HU-SEG-02",
+      "epic": "EP-05",
+      "kind": "story",
+      "title": "Consultar el historial de un equipo",
+      "role": "técnico de IT",
+      "goal": "consultar el historial de préstamos de un equipo",
+      "benefit": "saber quién lo tuvo y cuándo sin buscar en la hoja de cálculo",
+      "requirements": [
+        "RQ.009",
+        "RQ.014"
+      ],
+      "context": "IT consulta el historial de cada equipo: sus préstamos del más reciente al más antiguo, con persona, devolución y estado reservado, prestado o devuelto (RQ.009; peticion.md, anexo).",
+      "acceptanceCriteria": [
+        {
+          "type": "positive",
+          "given": "el equipo «Proyector 01» prestado y devuelto por «ana.perez@empresa.com» con la devolución «2030-05-01» y después reservado a «lucia.gomez@empresa.com» con la devolución «2030-06-15»",
+          "when": "el técnico de IT «it.soporte@empresa.com» consulta su historial",
+          "then": "recibe 200 con la reserva de «lucia.gomez@empresa.com» en estado «reservado» primero y el préstamo de «ana.perez@empresa.com» en estado «devuelto» después"
+        },
+        {
+          "type": "negative",
+          "given": "ningún equipo con el id «no-existe»",
+          "when": "el técnico de IT «it.soporte@empresa.com» consulta el historial del equipo «no-existe»",
+          "then": "recibe 404 con {\"error\": \"No existe el equipo\"}"
+        }
+      ],
+      "definitionOfDone": "Criterios de aceptación probados.\nRespuesta y errores exactamente como en el anexo.",
+      "priority": "should",
+      "estimate": {
+        "size": "M",
+        "hours": 4
+      },
+      "storyPoints": 3,
+      "status": "published",
+      "sprint": "SP-01",
+      "assignee": "P-01",
+      "blockedBy": [
+        "HU-PRE-03"
+      ],
+      "blockedByReasons": {
+        "HU-PRE-03": "El historial muestra los préstamos devueltos."
+      },
+      "readiness": {
+        "state": "partial",
+        "pending": "DoR-08: depende de HU-PRE-03, sin resolver ni planificada en un sprint anterior · supuestos sin confirmar: DoR-04, DoR-05, DoR-06, DoR-07, DoR-09"
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "id": "TA-001",
+      "story": "HU-ACC-01",
+      "title": "Verificación del token de identidad de Google y del correo verificado en todas las rutas",
+      "discipline": "backend",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-002",
+      "story": "HU-ACC-01",
+      "title": "Inicio de sesión con Google en la aplicación web",
+      "discipline": "frontend",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-003",
+      "story": "HU-ACC-01",
+      "title": "Pruebas de acceso con token válido, sin token y de otro cliente OAuth",
+      "discipline": "qa",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-004",
+      "story": "HU-ACC-02",
+      "title": "Comprobación de cuentas de IT a partir de CORREOS_IT sin distinguir mayúsculas",
+      "discipline": "backend",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-005",
+      "story": "HU-ACC-02",
+      "title": "Pruebas de las operaciones «Solo IT» con cuentas de IT y de empleado",
+      "discipline": "qa",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-006",
+      "story": "HU-EQU-01",
+      "title": "Colección de equipos con el nombre normalizado único",
+      "discipline": "data",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-007",
+      "story": "HU-EQU-01",
+      "title": "Ruta de alta de equipos con sus errores",
+      "discipline": "backend",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-008",
+      "story": "HU-EQU-01",
+      "title": "Formulario de alta de equipos para IT",
+      "discipline": "frontend",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-009",
+      "story": "HU-EQU-01",
+      "title": "Pruebas del alta, del nombre vacío y del nombre repetido",
+      "discipline": "qa",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-010",
+      "story": "HU-EQU-02",
+      "title": "Ruta de la lista de equipos con persona y devolución",
+      "discipline": "backend",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-011",
+      "story": "HU-EQU-02",
+      "title": "Pantalla de la lista de equipos con su estado",
+      "discipline": "frontend",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-012",
+      "story": "HU-EQU-02",
+      "title": "Pruebas de la lista con equipos en cada estado y vacía",
+      "discipline": "qa",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-013",
+      "story": "HU-SOL-01",
+      "title": "Registro de préstamos con su estado y fecha de devolución",
+      "discipline": "data",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-014",
+      "story": "HU-SOL-01",
+      "title": "Ruta de solicitud con la validación de la fecha en Madrid",
+      "discipline": "backend",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-015",
+      "story": "HU-SOL-01",
+      "title": "Botón para pedir un equipo libre con su fecha de devolución",
+      "discipline": "frontend",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-016",
+      "story": "HU-SOL-01",
+      "title": "Pruebas de la solicitud y de cada error de la fecha",
+      "discipline": "qa",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-017",
+      "story": "HU-SOL-02",
+      "title": "Documento del préstamo activo por equipo, creado solo si no existe",
+      "discipline": "data",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-018",
+      "story": "HU-SOL-02",
+      "title": "Transacción que reserva o presta el equipo una sola vez",
+      "discipline": "backend",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-019",
+      "story": "HU-SOL-02",
+      "title": "Pruebas de peticiones simultáneas de solicitud y de mostrador",
+      "discipline": "qa",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-020",
+      "story": "HU-PRE-01",
+      "title": "Ruta de entrega de un equipo reservado",
+      "discipline": "backend",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-021",
+      "story": "HU-PRE-01",
+      "title": "Acción de entrega en la pantalla de IT",
+      "discipline": "frontend",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-022",
+      "story": "HU-PRE-01",
+      "title": "Pruebas de la entrega y de sus errores",
+      "discipline": "qa",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-023",
+      "story": "HU-PRE-02",
+      "title": "Ruta de préstamo en el mostrador que admite fechas pasadas",
+      "discipline": "backend",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-024",
+      "story": "HU-PRE-02",
+      "title": "Formulario de préstamo en el mostrador",
+      "discipline": "frontend",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-025",
+      "story": "HU-PRE-02",
+      "title": "Pruebas del préstamo en el mostrador y de sus errores",
+      "discipline": "qa",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-026",
+      "story": "HU-PRE-03",
+      "title": "Ruta de devolución que libera el equipo",
+      "discipline": "backend",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-027",
+      "story": "HU-PRE-03",
+      "title": "Acción de devolución en la pantalla de IT",
+      "discipline": "frontend",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-028",
+      "story": "HU-PRE-03",
+      "title": "Pruebas de la devolución y de sus errores",
+      "discipline": "qa",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-029",
+      "story": "HU-SEG-01",
+      "title": "Consulta de préstamos activos ordenada por fecha de devolución",
+      "discipline": "data",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-030",
+      "story": "HU-SEG-01",
+      "title": "Ruta de préstamos vencidos con el día de Madrid",
+      "discipline": "backend",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-031",
+      "story": "HU-SEG-01",
+      "title": "Pantalla de préstamos vencidos para IT",
+      "discipline": "frontend",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-032",
+      "story": "HU-SEG-01",
+      "title": "Pruebas de los vencidos, su orden y la lista vacía",
+      "discipline": "qa",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-033",
+      "story": "HU-SEG-02",
+      "title": "Ruta del historial de un equipo ordenado del más reciente al más antiguo",
+      "discipline": "backend",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-034",
+      "story": "HU-SEG-02",
+      "title": "Pantalla del historial de un equipo",
+      "discipline": "frontend",
+      "assignee": "P-01"
+    },
+    {
+      "id": "TA-035",
+      "story": "HU-SEG-02",
+      "title": "Pruebas del historial y del equipo inexistente",
+      "discipline": "qa",
+      "assignee": "P-01"
+    }
+  ],
+  "team": [
+    {
+      "id": "P-01",
+      "name": "José Luis Calvo",
+      "role": "Desarrollo",
+      "dedication": 1,
+      "usesAiAgent": true
+    }
+  ],
+  "sprints": [
+    {
+      "id": "SP-01",
+      "name": "Sprint 1",
+      "goal": "Que empleados e IT gestionen en la aplicación todo el ciclo de un préstamo, desde el alta del equipo hasta su devolución, los vencidos y el historial.",
+      "start": "2026-11-16",
+      "end": "2026-11-27",
+      "capacityHours": 56
+    }
+  ],
+  "assumptions": [
+    "[SUPUESTO] Valores del sprint: 10 días laborables, 8 horas al día y factor de foco 0,7; el equipo no ha dado los suyos.",
+    "[SUPUESTO] Modalidad de desarrollo: solo trabajo manual; el equipo no ha dicho si usará IA.",
+    "[SUPUESTO] La aplicación tiene una interfaz web para empleados e IT, además de la API — la petición habla de una «aplicación» en la que los empleados «ven» los equipos, pero el anexo solo define la API.",
+    "[SUPUESTO] El historial guarda una entrada por cada reserva o préstamo, cuyo estado pasa de reservado a prestado y a devuelto — se deduce de los estados que devuelve el historial.",
+    "[SUPUESTO] Un equipo reservado no se puede devolver ni anular; solo IT puede entregarlo — el anexo solo admite la devolución de un equipo prestado y deja fuera la anulación.",
+    "[SUPUESTO] El correo de ejemplo del anexo es ficticio y se copia tal cual porque forma parte de la API fijada — el anexo lo usa solo como ejemplo de petición.",
+    "[SUPUESTO] ¿Qué pasa con una reserva que IT no llega a entregar?: sigue reservada hasta que IT la entrega; esta entrega no anula ni caduca reservas (supuesto razonable: el anexo no define anulación y la petición la deja fuera de alcance).",
+    "[SUPUESTO] ¿Es intencionado que la lista de equipos muestre a todos el correo de quien tiene cada equipo?: sí (intent.md, API fijada por el cliente: «Ver los equipos | Todos | … si está reservado o prestado, también persona y devolucion»).",
+    "[SUPUESTO] ¿Hay un máximo de días de préstamo o de fecha de devolución futura?: no hay máximo; solo se valida que la fecha exista y, en las solicitudes, que no sea anterior a hoy (supuesto razonable: el anexo no fija ningún tope).",
+    "[SUPUESTO] ¿Se valida que la persona del préstamo en el mostrador sea un correo del dominio de la empresa?: no; solo se exige que no falte (intent.md, API fijada por el cliente: el único error de la persona es 400 «Faltan la persona o la fecha de devolución»)."
+  ],
+  "openQuestions": [
+    "[media] ¿Cuántos equipos y usuarios se esperan?",
+    "[media] ¿Cómo se mide que «todos los préstamos pasan por la aplicación» y quién lo comprueba?",
+    "[baja] ¿Se migran los datos actuales de la hoja de cálculo?",
+    "[media] ¿Se añaden los enablers transversales de la plantilla (Sprint 0, rendimiento, pentesting, UAT y despliegue)?",
+    "[media] ¿Qué historias son imprescindibles para la primera entrega? Hoy 10 de 11 tienen la prioridad más alta."
+  ],
+  "providers": {
+    "local": {
+      "exportedAt": "2026-11-09T17:19:42Z",
+      "files": [
+        ".diverger/prestamo-de-equipos-de-it/backlog.md",
+        ".diverger/prestamo-de-equipos-de-it/backlog.xlsx"
+      ],
+      "stories": [
+        "HU-ACC-01",
+        "HU-ACC-02",
+        "HU-EQU-01",
+        "HU-EQU-02",
+        "HU-PRE-01",
+        "HU-PRE-02",
+        "HU-PRE-03",
+        "HU-SEG-01",
+        "HU-SEG-02",
+        "HU-SOL-01",
+        "HU-SOL-02"
+      ]
+    }
+  }
+}
