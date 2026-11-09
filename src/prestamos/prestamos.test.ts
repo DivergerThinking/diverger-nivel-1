@@ -151,6 +151,65 @@ describe("POST /api/equipos/:id/solicitud", () => {
   });
 });
 
+const entregar = (id: string, token = "it") =>
+  app.inject({ method: "POST", url: `/api/equipos/${id}/entrega`, headers: { authorization: `Bearer ${token}` } });
+
+describe("POST /api/equipos/:id/entrega", () => {
+  it("entrega un equipo reservado con la misma persona y devolución de la solicitud", async () => {
+    const id = await darDeAlta("Portátil 07");
+    await pedir(id, { devolucion: "2030-06-15" });
+    const r = await entregar(id);
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toEqual({
+      id,
+      nombre: "Portátil 07",
+      estado: "prestado",
+      persona: "lucia.gomez@empresa.com",
+      devolucion: "2030-06-15",
+    });
+    expect(await estadoDe(id)).toMatchObject({ estado: "prestado", persona: "lucia.gomez@empresa.com" });
+    const [prestamo] = await almacen.listar<{ estado: string }>(COLECCION_PRESTAMOS);
+    expect(prestamo?.estado).toBe("prestado");
+  });
+
+  it("un equipo disponible responde 409 «El equipo no está reservado» y sigue disponible", async () => {
+    const id = await darDeAlta("Portátil 07");
+    const r = await entregar(id);
+    expect(r.statusCode).toBe(409);
+    expect(r.json()).toEqual({ error: "El equipo no está reservado" });
+    expect((await estadoDe(id))?.estado).toBe("disponible");
+  });
+
+  it("un equipo ya prestado responde 409 «El equipo no está reservado»", async () => {
+    const id = await darDeAlta("Portátil 07");
+    await pedir(id, { devolucion: "2030-06-15" });
+    await entregar(id);
+    const r = await entregar(id);
+    expect(r.statusCode).toBe(409);
+    expect(r.json()).toEqual({ error: "El equipo no está reservado" });
+  });
+
+  it("un equipo que no existe responde 404 «No existe el equipo»", async () => {
+    const r = await entregar("no-existe");
+    expect(r.statusCode).toBe(404);
+    expect(r.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("una cuenta que no es de IT responde 403 y el equipo sigue reservado", async () => {
+    const id = await darDeAlta("Portátil 07");
+    await pedir(id, { devolucion: "2030-06-15" });
+    const r = await entregar(id, "lucia");
+    expect(r.statusCode).toBe(403);
+    expect(r.json()).toEqual({ error: "Solo IT puede hacer esto." });
+    expect((await estadoDe(id))?.estado).toBe("reservado");
+  });
+
+  it("sin sesión responde 401", async () => {
+    const r = await app.inject({ method: "POST", url: "/api/equipos/x/entrega" });
+    expect(r.statusCode).toBe(401);
+  });
+});
+
 describe("GET /api/equipos", () => {
   it("una empleada ve «Portátil 07» disponible sin persona ni devolución y «Proyector 01» prestado con persona y devolución", async () => {
     const portatil = await darDeAlta("Portátil 07");

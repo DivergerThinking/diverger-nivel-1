@@ -80,6 +80,33 @@ export async function solicitarEquipo(
   });
 }
 
+export type ResultadoEntrega =
+  | { ok: true; equipo: Equipo }
+  | { ok: false; error: "no-existe" | "no-reservado" };
+
+/** Entrega un equipo reservado: pasa a prestado con la misma persona y devolución de la solicitud. */
+export async function entregarEquipo(almacen: Almacen, equipoId: string): Promise<ResultadoEntrega> {
+  const equipo = await obtenerEquipo(almacen, equipoId);
+  if (!equipo) return { ok: false, error: "no-existe" };
+  return almacen.transaccion<ResultadoEntrega>(async (tx) => {
+    const activo = await tx.obtener<DocumentoActivo>(COLECCION_ACTIVOS, equipoId);
+    if (activo?.estado !== "reservado") return { ok: false, error: "no-reservado" };
+    tx.guardar(COLECCION_ACTIVOS, equipoId, { ...activo, estado: "prestado" });
+    const prestamo = await tx.obtener<Record<string, unknown>>(COLECCION_PRESTAMOS, activo.prestamoId);
+    if (prestamo) tx.guardar(COLECCION_PRESTAMOS, activo.prestamoId, { ...prestamo, estado: "prestado" });
+    return {
+      ok: true,
+      equipo: {
+        id: equipo.id,
+        nombre: equipo.nombre,
+        estado: "prestado",
+        persona: activo.persona,
+        devolucion: activo.devolucion,
+      },
+    };
+  });
+}
+
 /** Todos los equipos con su estado; con persona y devolución solo si están reservados o prestados. */
 export async function listarEquiposConEstado(almacen: Almacen): Promise<Equipo[]> {
   const equipos = await listarEquipos(almacen);
