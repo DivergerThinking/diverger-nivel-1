@@ -5,5 +5,6 @@ import type { OpcionesContexto } from "../lib/datos.js";
 import { rutas as cuentas } from "../src/cuentas/index.js";
 import { rutas as ejemplo } from "../src/ejemplo/index.js";
 import { rutas as equipos } from "../src/equipos/index.js";
+import { rutas as prestamos } from "../src/prestamos/index.js";
 
-export const contextos: FastifyPluginAsync<OpcionesContexto>[] = [cuentas, ejemplo, equipos];
+export const contextos: FastifyPluginAsync<OpcionesContexto>[] = [cuentas, ejemplo, equipos, prestamos];
