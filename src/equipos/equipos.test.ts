@@ -70,6 +70,40 @@ describe("POST /api/equipos", () => {
   });
 });
 
+describe("POST /api/equipos: nombre", () => {
+  it("da de alta «Portátil 07» con id, nombre y estado «disponible»", async () => {
+    const r = await alta("it", "Portátil 07");
+    expect(r.statusCode).toBe(201);
+    expect(r.json<{ nombre: string; estado: string }>()).toMatchObject({ nombre: "Portátil 07", estado: "disponible" });
+  });
+
+  it.each(["", "   ", undefined])("el nombre %j responde 400 «Falta el nombre del equipo» y no crea nada", async (nombre) => {
+    const r = await app.inject({
+      method: "POST",
+      url: "/api/equipos",
+      headers: { authorization: "Bearer it" },
+      payload: nombre === undefined ? {} : { nombre },
+    });
+    expect(r.statusCode).toBe(400);
+    expect(r.json()).toEqual({ error: "Falta el nombre del equipo" });
+    expect(await listarEquipos(almacen)).toEqual([]);
+  });
+
+  it("un nombre que solo cambia en mayúsculas o espacios responde 409 «Ya hay un equipo con ese nombre» y no crea otro", async () => {
+    await alta("it", "Portátil 07");
+    const r = await alta("it", " portátil 07 ");
+    expect(r.statusCode).toBe(409);
+    expect(r.json()).toEqual({ error: "Ya hay un equipo con ese nombre" });
+    expect(await listarEquipos(almacen)).toHaveLength(1);
+  });
+
+  it("dos altas a la vez con el mismo nombre: una sale bien y la otra recibe 409", async () => {
+    const respuestas = await Promise.all([alta("it", "Monitor 03"), alta("it", "MONITOR 03")]);
+    expect(respuestas.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+    expect(await listarEquipos(almacen)).toHaveLength(1);
+  });
+});
+
 describe("consulta de equipos para otros contextos", () => {
   it("obtenerEquipo devuelve el equipo dado de alta y undefined si no existe", async () => {
     const creado = (await alta("it", "  Portátil 07 ")).json<{ id: string }>();
