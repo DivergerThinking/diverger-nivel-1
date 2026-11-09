@@ -107,6 +107,24 @@ export async function entregarEquipo(almacen: Almacen, equipoId: string): Promis
   });
 }
 
+export type ResultadoDevolucion =
+  | { ok: true; equipo: Equipo }
+  | { ok: false; error: "no-existe" | "no-prestado" };
+
+/** Apunta la devolución de un equipo prestado: queda disponible y el préstamo pasa a devuelto. */
+export async function devolverEquipo(almacen: Almacen, equipoId: string): Promise<ResultadoDevolucion> {
+  const equipo = await obtenerEquipo(almacen, equipoId);
+  if (!equipo) return { ok: false, error: "no-existe" };
+  return almacen.transaccion<ResultadoDevolucion>(async (tx) => {
+    const activo = await tx.obtener<DocumentoActivo>(COLECCION_ACTIVOS, equipoId);
+    if (activo?.estado !== "prestado") return { ok: false, error: "no-prestado" };
+    tx.borrar(COLECCION_ACTIVOS, equipoId);
+    const prestamo = await tx.obtener<Record<string, unknown>>(COLECCION_PRESTAMOS, activo.prestamoId);
+    if (prestamo) tx.guardar(COLECCION_PRESTAMOS, activo.prestamoId, { ...prestamo, estado: "devuelto" });
+    return { ok: true, equipo: { id: equipo.id, nombre: equipo.nombre, estado: "disponible" } };
+  });
+}
+
 export type ResultadoPrestamo =
   | { ok: true; equipo: Equipo }
   | { ok: false; error: "faltan-datos" | "devolucion-no-valida" | "no-existe" | "no-disponible" };

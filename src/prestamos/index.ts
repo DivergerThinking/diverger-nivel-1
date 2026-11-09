@@ -2,7 +2,14 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { OpcionesContexto } from "../../lib/datos.js";
 import { exigirIT } from "../cuentas/index.js";
-import { entregarEquipo, listarEquiposConEstado, prestarEquipo, solicitarEquipo, type Equipo } from "./prestamo.js";
+import {
+  devolverEquipo,
+  entregarEquipo,
+  listarEquiposConEstado,
+  prestarEquipo,
+  solicitarEquipo,
+  type Equipo,
+} from "./prestamo.js";
 import type { components } from "./api.gen.js";
 
 export { listarEquiposConEstado, type Equipo } from "./prestamo.js";
@@ -64,5 +71,16 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
         return reply.code(409).send({ error: "El equipo no está disponible" });
     }
   });
+
+  app.post<{ Params: { id: string }; Reply: Equipo | ErrorApi }>(
+    "/api/equipos/:id/devolucion",
+    { preHandler: exigirIT },
+    async (request, reply) => {
+      const resultado = await devolverEquipo(almacen, request.params.id);
+      if (resultado.ok) return reply.code(200).send(resultado.equipo);
+      if (resultado.error === "no-existe") return reply.code(404).send({ error: "No existe el equipo" });
+      return reply.code(409).send({ error: "El equipo no está prestado" });
+    },
+  );
   return Promise.resolve();
 };

@@ -333,6 +333,67 @@ describe("POST /api/equipos/:id/prestamo", () => {
   });
 });
 
+const devolver = (id: string, token = "it") =>
+  app.inject({ method: "POST", url: `/api/equipos/${id}/devolucion`, headers: { authorization: `Bearer ${token}` } });
+
+describe("POST /api/equipos/:id/devolucion", () => {
+  it("un equipo prestado queda disponible, sin persona ni devolución, y su préstamo pasa a devuelto", async () => {
+    const id = await darDeAlta("Proyector 01");
+    await prestar(id, { persona: "ana.perez@empresa.com", devolucion: "2030-06-15" });
+    const r = await devolver(id);
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toEqual({ id, nombre: "Proyector 01", estado: "disponible" });
+    expect(await estadoDe(id)).toEqual({ id, nombre: "Proyector 01", estado: "disponible" });
+    expect(await almacen.listar(COLECCION_ACTIVOS)).toHaveLength(0);
+    const [prestamo] = await almacen.listar<{ estado: string }>(COLECCION_PRESTAMOS);
+    expect(prestamo?.estado).toBe("devuelto");
+  });
+
+  it("el equipo devuelto se puede volver a prestar", async () => {
+    const id = await darDeAlta("Proyector 01");
+    await prestar(id, { persona: "ana.perez@empresa.com", devolucion: "2030-06-15" });
+    await devolver(id);
+    const r = await pedir(id, { devolucion: "2030-07-01" });
+    expect(r.statusCode).toBe(201);
+  });
+
+  it("un equipo reservado responde 409 «El equipo no está prestado» y sigue reservado", async () => {
+    const id = await darDeAlta("Portátil 07");
+    await pedir(id, { devolucion: "2030-06-15" });
+    const r = await devolver(id);
+    expect(r.statusCode).toBe(409);
+    expect(r.json()).toEqual({ error: "El equipo no está prestado" });
+    expect(await estadoDe(id)).toMatchObject({ estado: "reservado", persona: "lucia.gomez@empresa.com" });
+  });
+
+  it("un equipo disponible responde 409 «El equipo no está prestado»", async () => {
+    const id = await darDeAlta("Portátil 07");
+    const r = await devolver(id);
+    expect(r.statusCode).toBe(409);
+    expect(r.json()).toEqual({ error: "El equipo no está prestado" });
+  });
+
+  it("un equipo que no existe responde 404 «No existe el equipo»", async () => {
+    const r = await devolver("no-existe");
+    expect(r.statusCode).toBe(404);
+    expect(r.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("una cuenta que no es de IT responde 403 y el equipo sigue prestado", async () => {
+    const id = await darDeAlta("Proyector 01");
+    await prestar(id, { persona: "ana.perez@empresa.com", devolucion: "2030-06-15" });
+    const r = await devolver(id, "lucia");
+    expect(r.statusCode).toBe(403);
+    expect(r.json()).toEqual({ error: "Solo IT puede hacer esto." });
+    expect((await estadoDe(id))?.estado).toBe("prestado");
+  });
+
+  it("sin sesión responde 401", async () => {
+    const r = await app.inject({ method: "POST", url: "/api/equipos/x/devolucion" });
+    expect(r.statusCode).toBe(401);
+  });
+});
+
 describe("GET /api/equipos", () => {
   it("una empleada ve «Portátil 07» disponible sin persona ni devolución y «Proyector 01» prestado con persona y devolución", async () => {
     const portatil = await darDeAlta("Portátil 07");
