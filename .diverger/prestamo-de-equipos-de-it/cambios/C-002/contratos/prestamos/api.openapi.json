@@ -1,0 +1,425 @@
+{
+  "openapi": "3.1.0",
+  "info": { "title": "Préstamos", "version": "2.1.0" },
+  "servers": [{ "url": "/" }],
+  "security": [{ "google": [] }],
+  "paths": {
+    "/api/equipos": {
+      "get": {
+        "operationId": "prestamos.listarEquipos",
+        "summary": "Ver los equipos (Todos)",
+        "responses": {
+          "200": {
+            "description": "La lista de equipos con su estado",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Equipo" } }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/SinSesion" }
+        }
+      }
+    },
+    "/api/equipos/{id}/solicitud": {
+      "post": {
+        "operationId": "prestamos.crearSolicitud",
+        "summary": "Pedir un equipo (Todos)",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Solicitud" },
+              "example": { "devolucion": "2026-11-20" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "El equipo con estado reservado, persona (el correo de quien lo pide) y devolucion",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Equipo" } } }
+          },
+          "400": {
+            "description": "Falta la fecha de devolución, no es una fecha real o ya ha pasado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "falta": { "value": { "error": "Falta la fecha de devolución" } },
+                  "noValida": { "value": { "error": "La fecha de devolución no es válida" } },
+                  "pasada": { "value": { "error": "La fecha de devolución ya ha pasado" } }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/SinSesion" },
+          "404": { "$ref": "#/components/responses/NoExiste" },
+          "409": { "$ref": "#/components/responses/NoDisponible" }
+        }
+      },
+      "get": {
+        "operationId": "prestamos.verSolicitud",
+        "summary": "Ver la solicitud pendiente de un equipo, con su nota (Solo IT)",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "responses": {
+          "200": {
+            "description": "La persona y la devolucion de la solicitud reservada, y su nota si tiene una",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SolicitudPendiente" },
+                "example": { "persona": "ana.perez@empresa.com", "devolucion": "2026-11-20", "nota": "Lo recojo el jueves por la mañana" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/SinSesion" },
+          "403": { "$ref": "#/components/responses/SoloIt" },
+          "404": { "$ref": "#/components/responses/NoExiste" },
+          "409": { "$ref": "#/components/responses/NoReservado" }
+        }
+      }
+    },
+    "/api/equipos/{id}/solicitud/nota": {
+      "put": {
+        "operationId": "prestamos.anotarSolicitud",
+        "summary": "Añadir una nota a mi solicitud pendiente (Todos)",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/NotaSolicitud" },
+              "example": { "nota": "Lo recojo el jueves por la mañana" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "El equipo con estado reservado, persona y devolucion de la solicitud; la nota no se devuelve",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Equipo" } } }
+          },
+          "400": {
+            "description": "Falta la nota, o tiene más de 200 caracteres",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "falta": { "value": { "error": "Falta la nota" } },
+                  "larga": { "value": { "error": "La nota es demasiado larga" } }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/SinSesion" },
+          "403": { "$ref": "#/components/responses/NoEsQuienPide" },
+          "404": { "$ref": "#/components/responses/NoExiste" },
+          "409": { "$ref": "#/components/responses/NoReservado" }
+        }
+      }
+    },
+    "/api/equipos/{id}/entrega": {
+      "post": {
+        "operationId": "prestamos.entregarEquipo",
+        "summary": "Entregar un equipo reservado (Solo IT)",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "responses": {
+          "200": {
+            "description": "El equipo con estado prestado, con la misma persona y devolucion de la solicitud",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Equipo" } } }
+          },
+          "401": { "$ref": "#/components/responses/SinSesion" },
+          "403": { "$ref": "#/components/responses/SoloIt" },
+          "404": { "$ref": "#/components/responses/NoExiste" },
+          "409": {
+            "description": "El equipo no está reservado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "El equipo no está reservado" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/equipos/{id}/prestamo": {
+      "post": {
+        "operationId": "prestamos.prestarEquipo",
+        "summary": "Prestar en el mostrador (Solo IT)",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PrestamoMostrador" },
+              "example": { "persona": "ana.perez@empresa.com", "devolucion": "2026-11-20" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "El equipo con estado prestado, persona y devolucion",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Equipo" } } }
+          },
+          "400": {
+            "description": "Faltan la persona o la fecha, o la fecha no es una fecha real",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "faltan": { "value": { "error": "Faltan la persona o la fecha de devolución" } },
+                  "noValida": { "value": { "error": "La fecha de devolución no es válida" } }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/SinSesion" },
+          "403": { "$ref": "#/components/responses/SoloIt" },
+          "404": { "$ref": "#/components/responses/NoExiste" },
+          "409": { "$ref": "#/components/responses/NoDisponible" }
+        }
+      }
+    },
+    "/api/equipos/{id}/devolucion": {
+      "post": {
+        "operationId": "prestamos.devolverEquipo",
+        "summary": "Apuntar la devolución (Solo IT)",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "responses": {
+          "200": {
+            "description": "El equipo con estado disponible, sin persona ni devolucion",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Equipo" } } }
+          },
+          "401": { "$ref": "#/components/responses/SinSesion" },
+          "403": { "$ref": "#/components/responses/SoloIt" },
+          "404": { "$ref": "#/components/responses/NoExiste" },
+          "409": {
+            "description": "El equipo no está prestado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "El equipo no está prestado" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/equipos/{id}/baja": {
+      "post": {
+        "operationId": "prestamos.darDeBajaEquipo",
+        "summary": "Dar de baja un equipo averiado o retirado (Solo IT)",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DarDeBaja" },
+              "example": { "motivo": "Averiado: no enciende" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "El equipo con estado dado de baja y su motivo, sin persona ni devolucion",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Equipo" } } }
+          },
+          "400": {
+            "description": "Falta el motivo de la baja",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "Falta el motivo de la baja" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/SinSesion" },
+          "403": { "$ref": "#/components/responses/SoloIt" },
+          "404": { "$ref": "#/components/responses/NoExiste" },
+          "409": {
+            "description": "El equipo tiene un préstamo activo (reservado o prestado) o ya está dado de baja",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "prestamoActivo": { "value": { "error": "El equipo tiene un préstamo activo" } },
+                  "yaDadoDeBaja": { "value": { "error": "El equipo ya está dado de baja" } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/prestamos/vencidos": {
+      "get": {
+        "operationId": "prestamos.listarVencidos",
+        "summary": "Ver los préstamos vencidos (Solo IT)",
+        "responses": {
+          "200": {
+            "description": "Los equipos prestados cuya fecha de devolución es anterior a hoy, del más antiguo al más reciente",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Vencido" } }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/SinSesion" },
+          "403": { "$ref": "#/components/responses/SoloIt" }
+        }
+      }
+    },
+    "/api/equipos/{id}/historial": {
+      "get": {
+        "operationId": "prestamos.obtenerHistorial",
+        "summary": "Ver el historial de un equipo (Solo IT)",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "responses": {
+          "200": {
+            "description": "Los préstamos del equipo, del más reciente al más antiguo",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/EntradaHistorial" } }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/SinSesion" },
+          "403": { "$ref": "#/components/responses/SoloIt" },
+          "404": { "$ref": "#/components/responses/NoExiste" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": { "google": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" } },
+    "parameters": {
+      "Id": { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+    },
+    "schemas": {
+      "Equipo": {
+        "type": "object",
+        "required": ["id", "nombre", "estado"],
+        "properties": {
+          "id": { "type": "string" },
+          "nombre": { "type": "string" },
+          "estado": { "type": "string", "enum": ["disponible", "reservado", "prestado", "dado de baja"] },
+          "persona": { "type": "string", "description": "El correo de quien lo tiene; solo si está reservado o prestado" },
+          "devolucion": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "Solo si está reservado o prestado" },
+          "motivo": { "type": "string", "description": "El motivo de la baja; solo si está dado de baja" }
+        }
+      },
+      "Solicitud": {
+        "type": "object",
+        "properties": { "devolucion": { "type": "string" } }
+      },
+      "NotaSolicitud": {
+        "type": "object",
+        "required": ["nota"],
+        "properties": {
+          "nota": { "type": "string", "description": "Texto corto, de hasta 200 caracteres, que añade quien pidió el equipo mientras está reservado. Una nota nueva sustituye a la anterior" }
+        }
+      },
+      "SolicitudPendiente": {
+        "type": "object",
+        "required": ["persona", "devolucion"],
+        "properties": {
+          "persona": { "type": "string", "description": "El correo de quien pidió el equipo" },
+          "devolucion": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+          "nota": { "type": "string", "description": "La nota que añadió quien pidió el equipo; solo si tiene una" }
+        }
+      },
+      "PrestamoMostrador": {
+        "type": "object",
+        "properties": {
+          "persona": { "type": "string" },
+          "devolucion": { "type": "string" }
+        }
+      },
+      "DarDeBaja": {
+        "type": "object",
+        "required": ["motivo"],
+        "properties": { "motivo": { "type": "string", "description": "Texto libre que explica por qué se da de baja el equipo" } }
+      },
+      "Vencido": {
+        "type": "object",
+        "required": ["id", "nombre", "persona", "devolucion"],
+        "properties": {
+          "id": { "type": "string" },
+          "nombre": { "type": "string" },
+          "persona": { "type": "string" },
+          "devolucion": { "type": "string" }
+        }
+      },
+      "EntradaHistorial": {
+        "type": "object",
+        "required": ["persona", "devolucion", "estado"],
+        "properties": {
+          "persona": { "type": "string" },
+          "devolucion": { "type": "string" },
+          "estado": { "type": "string", "enum": ["reservado", "prestado", "devuelto"] }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": { "error": { "type": "string" } }
+      }
+    },
+    "responses": {
+      "SinSesion": {
+        "description": "Sin un token válido",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": { "error": "Inicia sesión con Google." }
+          }
+        }
+      },
+      "SoloIt": {
+        "description": "La cuenta no es de IT",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": { "error": "Solo IT puede hacer esto." }
+          }
+        }
+      },
+      "NoEsQuienPide": {
+        "description": "La sesión no es la de quien pidió el equipo",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": { "error": "Solo quien pidió el equipo puede añadir una nota" }
+          }
+        }
+      },
+      "NoExiste": {
+        "description": "No existe el equipo",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": { "error": "No existe el equipo" }
+          }
+        }
+      },
+      "NoDisponible": {
+        "description": "El equipo está reservado, prestado o dado de baja",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": { "error": "El equipo no está disponible" }
+          }
+        }
+      },
+      "NoReservado": {
+        "description": "El equipo no está reservado",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": { "error": "El equipo no está reservado" }
+          }
+        }
+      }
+    }
+  }
+}

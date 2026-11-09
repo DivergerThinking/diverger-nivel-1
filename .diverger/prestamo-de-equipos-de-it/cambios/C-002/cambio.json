@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "id": "C-002",
+  "title": "Nota en la solicitud pendiente",
+  "status": "proposed",
+  "request": "En la iniciativa prestamo-de-equipos-de-it, añadir una historia nueva: cualquier empleado puede añadir una nota corta a su propia solicitud de préstamo mientras está pendiente, que IT ve al entregar el equipo. No cambia ninguna historia existente.",
+  "stories": {
+    "added": [
+      {
+        "id": "HU-SOL-03",
+        "epic": "EP-03",
+        "title": "Añadir una nota a mi solicitud pendiente",
+        "status": "draft",
+        "priority": "should",
+        "contexts": ["prestamos"],
+        "role": "empleado",
+        "goal": "añadir una nota corta a mi solicitud de un equipo mientras está pendiente",
+        "benefit": "que IT sepa al entregarlo lo que necesito, por ejemplo a qué hora lo recojo",
+        "acceptanceCriteria": [
+          {
+            "type": "positive",
+            "given": "el equipo «eq-7» reservado por «ana.perez@empresa.com» hasta el 2026-11-20",
+            "when": "ana.perez@empresa.com envía PUT /api/equipos/eq-7/solicitud/nota con {\"nota\": \"Lo recojo el jueves por la mañana\"}",
+            "then": "recibe 200 con el equipo en estado «reservado», persona «ana.perez@empresa.com» y devolución «2026-11-20», y sin ningún campo de nota"
+          },
+          {
+            "type": "positive",
+            "given": "el equipo «eq-7» reservado por «ana.perez@empresa.com» con la nota «Lo recojo el jueves por la mañana»",
+            "when": "un técnico de IT consulta GET /api/equipos/eq-7/solicitud",
+            "then": "recibe 200 con persona «ana.perez@empresa.com», devolución «2026-11-20» y nota «Lo recojo el jueves por la mañana»"
+          },
+          {
+            "type": "positive",
+            "given": "el equipo «eq-7» reservado por «ana.perez@empresa.com» con la nota «Lo recojo el jueves por la mañana»",
+            "when": "un empleado consulta GET /api/equipos",
+            "then": "recibe 200 con «eq-7» en estado «reservado» y sin ningún campo de nota"
+          },
+          {
+            "type": "negative",
+            "given": "el equipo «eq-7» reservado por «ana.perez@empresa.com»",
+            "when": "luis.gomez@empresa.com envía PUT /api/equipos/eq-7/solicitud/nota con {\"nota\": \"Lo recojo yo\"}",
+            "then": "recibe 403 con {\"error\": \"Solo quien pidió el equipo puede añadir una nota\"} y el equipo sigue reservado por «ana.perez@empresa.com» sin nota"
+          },
+          {
+            "type": "negative",
+            "given": "el equipo «eq-7» prestado a «ana.perez@empresa.com» hasta el 2026-11-20",
+            "when": "ana.perez@empresa.com envía PUT /api/equipos/eq-7/solicitud/nota con {\"nota\": \"Ya lo tengo\"}",
+            "then": "recibe 409 con {\"error\": \"El equipo no está reservado\"} y la nota no cambia"
+          },
+          {
+            "type": "negative",
+            "given": "el equipo «eq-7» reservado por «ana.perez@empresa.com»",
+            "when": "ana.perez@empresa.com envía PUT /api/equipos/eq-7/solicitud/nota con {\"nota\": \"\"}",
+            "then": "recibe 400 con {\"error\": \"Falta la nota\"} y la nota no cambia"
+          },
+          {
+            "type": "negative",
+            "given": "el equipo «eq-7» reservado por «ana.perez@empresa.com»",
+            "when": "ana.perez@empresa.com envía PUT /api/equipos/eq-7/solicitud/nota con una nota de 201 caracteres",
+            "then": "recibe 400 con {\"error\": \"La nota es demasiado larga\"} y la nota no cambia"
+          },
+          {
+            "type": "negative",
+            "given": "un empleado y el equipo «eq-7» reservado por «ana.perez@empresa.com»",
+            "when": "consulta GET /api/equipos/eq-7/solicitud",
+            "then": "recibe 403 con {\"error\": \"Solo IT puede hacer esto.\"}"
+          },
+          {
+            "type": "negative",
+            "given": "el equipo «eq-7» reservado por «ana.perez@empresa.com»",
+            "when": "llegan a la vez una nota de «ana.perez@empresa.com» y la entrega de un técnico de IT para «eq-7»",
+            "then": "la nota recibe 200 si llega antes que la entrega, o 409 con {\"error\": \"El equipo no está reservado\"} si llega después; la entrega recibe 200 en ambos casos"
+          },
+          {
+            "type": "negative",
+            "given": "no existe ningún equipo «eq-99»",
+            "when": "ana.perez@empresa.com envía PUT /api/equipos/eq-99/solicitud/nota con {\"nota\": \"Hola\"}",
+            "then": "recibe 404 con {\"error\": \"No existe el equipo\"}"
+          }
+        ]
+      }
+    ],
+    "modified": [],
+    "removed": []
+  },
+  "newContexts": [],
+  "contracts": [
+    {
+      "context": "prestamos",
+      "compatible": true,
+      "file": "contratos/prestamos/api.openapi.json",
+      "replaces": "spec/contextos/prestamos/api.openapi.json",
+      "base": "2.0.0"
+    }
+  ]
+}
