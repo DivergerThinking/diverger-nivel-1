@@ -163,6 +163,21 @@ export async function prestarEquipo(
   });
 }
 
+export type Vencido = components["schemas"]["Vencido"];
+
+/** Equipos prestados con la devolución anterior a hoy (día de Madrid), del más antiguo al más reciente. */
+export async function listarVencidos(almacen: Almacen, ahora: Date = new Date()): Promise<Vencido[]> {
+  const hoy = hoyEnMadrid(ahora);
+  const equipos = await listarEquiposConEstado(almacen);
+  const vencidos: Vencido[] = [];
+  for (const { id, nombre, estado, persona, devolucion } of equipos) {
+    if (estado === "prestado" && persona !== undefined && devolucion !== undefined && devolucion < hoy) {
+      vencidos.push({ id, nombre, persona, devolucion });
+    }
+  }
+  return vencidos.sort((a, b) => a.devolucion.localeCompare(b.devolucion));
+}
+
 /** Todos los equipos con su estado; con persona y devolución solo si están reservados o prestados. */
 export async function listarEquiposConEstado(almacen: Almacen): Promise<Equipo[]> {
   const equipos = await listarEquipos(almacen);

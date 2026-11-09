@@ -6,13 +6,15 @@ import {
   devolverEquipo,
   entregarEquipo,
   listarEquiposConEstado,
+  listarVencidos,
   prestarEquipo,
   solicitarEquipo,
   type Equipo,
+  type Vencido,
 } from "./prestamo.js";
 import type { components } from "./api.gen.js";
 
-export { listarEquiposConEstado, type Equipo } from "./prestamo.js";
+export { listarEquiposConEstado, listarVencidos, type Equipo, type Vencido } from "./prestamo.js";
 
 type ErrorApi = components["schemas"]["Error"];
 
@@ -81,6 +83,10 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
       if (resultado.error === "no-existe") return reply.code(404).send({ error: "No existe el equipo" });
       return reply.code(409).send({ error: "El equipo no está prestado" });
     },
+  );
+
+  app.get<{ Reply: Vencido[] }>("/api/prestamos/vencidos", { preHandler: exigirIT }, async () =>
+    listarVencidos(almacen),
   );
   return Promise.resolve();
 };
