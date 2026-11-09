@@ -49,6 +49,12 @@ describe("esCuentaIT", () => {
     expect(esCuentaIT("", "")).toBe(false);
     expect(esCuentaIT("", ",")).toBe(false);
   });
+  it("reconoce a una cuenta de IT y a la cuenta de servicio del inventario de la lista de los criterios", () => {
+    const lista = "it.soporte@empresa.com,inventario@empresa.iam.gserviceaccount.com";
+    expect(esCuentaIT("IT.Soporte@empresa.com", lista)).toBe(true);
+    expect(esCuentaIT("inventario@empresa.iam.gserviceaccount.com", lista)).toBe(true);
+    expect(esCuentaIT("lucia.gomez@empresa.com", lista)).toBe(false);
+  });
   it("cuentaDe devuelve el correo y esIT", () => {
     expect(cuentaDe("a@x.com", "a@x.com")).toEqual({ correo: "a@x.com", esIT: true });
   });
@@ -79,6 +85,18 @@ describe("exigirIT", () => {
     const r = await app.inject({ url: "/api/prueba/solo-it", headers: con("it") });
     expect(r.statusCode).toBe(200);
     expect(r.json()).toEqual({ hecho: true });
+  });
+  it("deja pasar a la cuenta de servicio del inventario si está en CORREOS_IT", async () => {
+    PERSONAS.inventario = { email: "inventario@empresa.iam.gserviceaccount.com", nombre: "Inventario" };
+    process.env.CORREOS_IT = "it.soporte@empresa.com,inventario@empresa.iam.gserviceaccount.com";
+    const r = await app.inject({ url: "/api/prueba/solo-it", headers: con("inventario") });
+    expect(r.statusCode).toBe(200);
+  });
+  it("responde 403 a todos si CORREOS_IT no está definida", async () => {
+    delete process.env.CORREOS_IT;
+    const r = await app.inject({ url: "/api/prueba/solo-it", headers: con("it") });
+    expect(r.statusCode).toBe(403);
+    expect(r.json()).toEqual({ error: "Solo IT puede hacer esto." });
   });
   it("responde 403 «Solo IT puede hacer esto.» a un empleado", async () => {
     const r = await app.inject({ url: "/api/prueba/solo-it", headers: con("lucia") });
