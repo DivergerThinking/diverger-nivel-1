@@ -147,6 +147,24 @@ export async function prestarEquipo(
   return { id: equipo.id, nombre: equipo.nombre, estado: "prestado", persona, devolucion };
 }
 
+/**
+ * Apunta la devolución de un equipo prestado: el préstamo queda «devuelto» en el historial y el equipo, disponible.
+ * Solo IT. El préstamo activo se lee y se cierra en una transacción para que dos devoluciones a la vez no se apunten dos veces.
+ */
+export async function devolverEquipo(almacen: Almacen, idEquipo: string, sesion: { email: string } | null): Promise<Equipo> {
+  exigirIT(sesion);
+  const equipo = await obtenerEquipo(almacen, idEquipo);
+  if (equipo === undefined) throw new ErrorPrestamo(404, "No existe el equipo");
+  await almacen.transaccion(async (tx) => {
+    const actual = await tx.obtener<PrestamoActivo>(COLECCION_ACTIVOS, idEquipo);
+    if (actual?.estado !== "prestado") throw new ErrorPrestamo(409, "El equipo no está prestado");
+    const prestamo = await tx.obtener<Record<string, unknown>>(COLECCION_PRESTAMOS, actual.idPrestamo);
+    tx.guardar(COLECCION_PRESTAMOS, actual.idPrestamo, { ...(prestamo ?? { ...actual, id: actual.idPrestamo }), estado: "devuelto" });
+    tx.borrar(COLECCION_ACTIVOS, idEquipo);
+  });
+  return { id: equipo.id, nombre: equipo.nombre, estado: "disponible" };
+}
+
 /** Los equipos con su estado: disponible sin préstamo activo; si no, el del préstamo activo con persona y devolución. */
 export async function listarEquiposConEstado(almacen: Almacen): Promise<Equipo[]> {
   const equipos = await listarEquiposDeEquipos(almacen);
