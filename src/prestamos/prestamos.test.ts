@@ -3,7 +3,7 @@ import { almacenEnMemoria } from "../../lib/datos.js";
 import { crearServidor } from "../../app/server.js";
 import { rutas as equipos } from "../equipos/index.js";
 import { listarEquiposConEstado, rutas } from "./index.js";
-import { ErrorPrestamo, esCuentaDeIT, exigirIT } from "./prestamos.js";
+import { ErrorPrestamo, esCuentaDeIT, exigirIT, solicitarEquipo } from "./prestamos.js";
 
 const ana = { email: "ana.perez@empresa.com", nombre: "Ana" };
 const servidor = (almacen = almacenEnMemoria()) =>
@@ -205,6 +205,96 @@ describe("operaciones de IT reservadas a CORREOS_IT (HU-ACC-02)", () => {
       expect(respuestas.map((r) => r.statusCode).sort()).toEqual([201, 409]);
       const rechazada = respuestas.find((r) => r.statusCode === 409);
       expect(rechazada?.json()).toEqual({ error: "El equipo no está disponible" });
+    });
+  });
+});
+
+describe("pedir un equipo disponible (HU-PRE-01)", () => {
+  const hoy = "2026-11-10";
+  const montar = async () => {
+    const almacen = almacenEnMemoria();
+    await almacen.guardar("equipos_equipos", "e7", { id: "e7", nombre: "Portátil 07" });
+    return almacen;
+  };
+  const disponible = { id: "e7", nombre: "Portátil 07", estado: "disponible" };
+
+  it("criterio 1: reserva el equipo a nombre de quien lo pide con la devolución indicada", async () => {
+    const almacen = await montar();
+    const equipo = await solicitarEquipo(almacen, "e7", ana.email, "2026-11-20", hoy);
+    expect(equipo).toEqual({
+      id: "e7",
+      nombre: "Portátil 07",
+      estado: "reservado",
+      persona: "ana.perez@empresa.com",
+      devolucion: "2026-11-20",
+    });
+    expect(await listarEquiposConEstado(almacen)).toEqual([equipo]);
+  });
+
+  it("criterio 2: una devolución igual a hoy en Madrid se acepta", async () => {
+    const almacen = await montar();
+    const equipo = await solicitarEquipo(almacen, "e7", ana.email, "2026-11-10", hoy);
+    expect(equipo.estado).toBe("reservado");
+    expect(equipo.devolucion).toBe("2026-11-10");
+  });
+
+  it("criterio 3: una devolución de ayer responde 400 «La fecha de devolución ya ha pasado»", async () => {
+    const almacen = await montar();
+    await expect(solicitarEquipo(almacen, "e7", ana.email, "2026-11-09", hoy)).rejects.toMatchObject({
+      codigo: 400,
+      message: "La fecha de devolución ya ha pasado",
+    });
+    expect(await listarEquiposConEstado(almacen)).toEqual([disponible]);
+  });
+
+  it.each(["2026-02-30", "20/11/2026", 20261120])(
+    "criterios 4 y 5: la devolución %j responde 400 «La fecha de devolución no es válida»",
+    async (devolucion) => {
+      const almacen = await montar();
+      await expect(solicitarEquipo(almacen, "e7", ana.email, devolucion, hoy)).rejects.toMatchObject({
+        codigo: 400,
+        message: "La fecha de devolución no es válida",
+      });
+      expect(await listarEquiposConEstado(almacen)).toEqual([disponible]);
+    },
+  );
+
+  it.each([undefined, null, ""])("criterio 6: sin fecha (%j) responde 400 «Falta la fecha de devolución»", async (devolucion) => {
+    const almacen = await montar();
+    await expect(solicitarEquipo(almacen, "e7", ana.email, devolucion, hoy)).rejects.toMatchObject({
+      codigo: 400,
+      message: "Falta la fecha de devolución",
+    });
+    expect(await listarEquiposConEstado(almacen)).toEqual([disponible]);
+  });
+
+  it("criterio 6 por la ruta: sin cuerpo responde 400 «Falta la fecha de devolución»", async () => {
+    const almacen = await montar();
+    const app = await servidor(almacen);
+    const respuesta = await app.inject({
+      method: "POST",
+      url: "/api/equipos/e7/solicitud",
+      headers: { authorization: "Bearer valido" },
+    });
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: "Falta la fecha de devolución" });
+  });
+
+  it("criterio 7: un equipo reservado a otra persona responde 409 y su reserva no cambia", async () => {
+    const almacen = await montar();
+    const reserva = await solicitarEquipo(almacen, "e7", "luis.gomez@empresa.com", "2026-11-15", hoy);
+    await expect(solicitarEquipo(almacen, "e7", ana.email, "2026-11-20", hoy)).rejects.toMatchObject({
+      codigo: 409,
+      message: "El equipo no está disponible",
+    });
+    expect(await listarEquiposConEstado(almacen)).toEqual([reserva]);
+  });
+
+  it("criterio 8: un equipo que no existe responde 404 «No existe el equipo»", async () => {
+    const almacen = await montar();
+    await expect(solicitarEquipo(almacen, "no-existe", ana.email, "2026-11-20", hoy)).rejects.toMatchObject({
+      codigo: 404,
+      message: "No existe el equipo",
     });
   });
 });
