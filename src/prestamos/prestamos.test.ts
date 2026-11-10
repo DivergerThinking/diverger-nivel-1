@@ -630,6 +630,95 @@ describe("apuntar la devolución de un equipo (HU-PRE-04)", () => {
   });
 });
 
+describe("peticiones simultáneas sobre el mismo equipo (EN-PRE-01)", () => {
+  const cuentas: Record<string, { email: string; nombre: string }> = {
+    ana,
+    luis: { email: "luis.gomez@empresa.com", nombre: "Luis" },
+    it: { email: "it.soporte@empresa.com", nombre: "IT" },
+  };
+  const montar = async (idEquipo: string, nombre: string) => {
+    const almacen = almacenEnMemoria();
+    await almacen.guardar("equipos_equipos", idEquipo, { id: idEquipo, nombre });
+    const app = await crearServidor({
+      googleClientId: "cliente-app",
+      verificarToken: (token) => Promise.resolve(cuentas[token] ?? null),
+      almacen,
+      contextos: [equipos, rutas],
+    });
+    const enviar = (token: string, url: string, payload: object) =>
+      app.inject({ method: "POST", url, headers: { authorization: `Bearer ${token}` }, payload });
+    const solicitar = (token: string) => enviar(token, `/api/equipos/${idEquipo}/solicitud`, { devolucion: "2999-11-20" });
+    const prestar = (persona: string) =>
+      enviar("it", `/api/equipos/${idEquipo}/prestamo`, { persona, devolucion: "2999-11-20" });
+    const equiposAhora = async () =>
+      (await app.inject({ method: "GET", url: "/api/equipos", headers: { authorization: "Bearer it" } })).json<
+        { id: string; estado: string; persona?: string }[]
+      >();
+    return { almacen, solicitar, prestar, equiposAhora };
+  };
+  const comprobarUnaSolaSalida = (respuestas: { statusCode: number; json: () => unknown }[]) => {
+    expect(respuestas.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+    expect(respuestas.find((r) => r.statusCode === 409)?.json()).toEqual({ error: "El equipo no está disponible" });
+  };
+
+  beforeEach(() => {
+    vi.stubEnv("CORREOS_IT", "it.soporte@empresa.com");
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("criterio 1: dos solicitudes a la vez, una 201 y otra 409, y el equipo queda reservado a una sola persona", async () => {
+    const { almacen, solicitar, equiposAhora } = await montar("e7", "Portátil 07");
+    const respuestas = await Promise.all([solicitar("ana"), solicitar("luis")]);
+    comprobarUnaSolaSalida(respuestas);
+    const ganadora = respuestas.find((r) => r.statusCode === 201)?.json<{ persona: string }>().persona;
+    expect(await equiposAhora()).toEqual([
+      { id: "e7", nombre: "Portátil 07", estado: "reservado", persona: ganadora, devolucion: "2999-11-20" },
+    ]);
+    expect(await almacen.listar("prestamos_prestamos")).toHaveLength(1);
+  });
+
+  it("criterio 2: una solicitud y un préstamo en el mostrador a la vez, nunca salen bien los dos", async () => {
+    const { almacen, solicitar, prestar, equiposAhora } = await montar("e3", "Monitor 03");
+    comprobarUnaSolaSalida(await Promise.all([solicitar("ana"), prestar("luis.gomez@empresa.com")]));
+    expect(await almacen.listar("prestamos_prestamos")).toHaveLength(1);
+    const lista = await equiposAhora();
+    expect(lista).toHaveLength(1);
+    expect(lista[0]?.id).toBe("e3");
+    expect(["ana.perez@empresa.com", "luis.gomez@empresa.com"]).toContain(lista[0]?.persona);
+  });
+
+  it("criterio 2: el préstamo del mostrador y la solicitud a la vez, en el orden contrario, tampoco salen bien los dos", async () => {
+    const { almacen, solicitar, prestar } = await montar("e3", "Monitor 03");
+    comprobarUnaSolaSalida(await Promise.all([prestar("luis.gomez@empresa.com"), solicitar("ana")]));
+    expect(await almacen.listar("prestamos_prestamos")).toHaveLength(1);
+  });
+
+  it("criterio 3: dos préstamos a la vez en el mostrador y GET /api/equipos lo muestra prestado a una sola persona", async () => {
+    const { prestar, equiposAhora } = await montar("e2", "Proyector 02");
+    const respuestas = await Promise.all([prestar(ana.email), prestar("luis.gomez@empresa.com")]);
+    comprobarUnaSolaSalida(respuestas);
+    const ganadora = respuestas.find((r) => r.statusCode === 201)?.json<{ persona: string }>().persona;
+    expect(await equiposAhora()).toEqual([
+      { id: "e2", nombre: "Proyector 02", estado: "prestado", persona: ganadora, devolucion: "2999-11-20" },
+    ]);
+  });
+
+  it("muchas peticiones a la vez: solo una sale bien y las demás reciben 409", async () => {
+    const { solicitar, prestar } = await montar("e2", "Proyector 02");
+    const respuestas = await Promise.all([
+      solicitar("ana"),
+      solicitar("luis"),
+      prestar("ana.perez@empresa.com"),
+      prestar("luis.gomez@empresa.com"),
+      solicitar("it"),
+    ]);
+    expect(respuestas.filter((r) => r.statusCode === 201)).toHaveLength(1);
+    expect(respuestas.filter((r) => r.statusCode === 409)).toHaveLength(4);
+  });
+});
+
 describe("sesión con Google en las rutas de préstamos (HU-ACC-01)", () => {
   it("con un token válido GET /api/equipos responde 200 con la lista", async () => {
     const almacen = almacenEnMemoria();

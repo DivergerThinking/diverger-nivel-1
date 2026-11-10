@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "EN-PRE-01-prestamos",
   "title": "Préstamos: evitar reservas y préstamos dobles simultáneos (EN-PRE-01)",
-  "status": "pending",
+  "status": "done",
   "story": "EN-PRE-01",
   "context": "prestamos",
   "modules": ["src/prestamos"],
