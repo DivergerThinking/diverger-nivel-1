@@ -1,0 +1,14 @@
+flowchart LR
+    EP_01["EP-01 · Acceso y permisos"]
+    HU_ACC_01["HU-ACC-01 · Entrar con la cuenta de Google de la empresa · publicada"]
+    EP_01 --> HU_ACC_01
+    HU_ACC_02["HU-ACC-02 · Reservar las operaciones de IT a sus cuentas · publicada"]
+    EP_01 --> HU_ACC_02
+    HU_INV_01["HU-INV-01 · Dar de alta un equipo · publicada"]
+    HU_INV_01 -.->|bloquea| HU_ACC_02
+    classDef epic fill:#ede7f6,stroke:#5e35b1,color:#311b92
+    classDef published fill:#e8f5e9,stroke:#43a047,color:#1b5e20
+    classDef external fill:#ffffff,stroke:#9e9e9e,color:#616161,stroke-dasharray:2 2
+    class EP_01 epic
+    class HU_ACC_01,HU_ACC_02 published
+    class HU_INV_01 external
