@@ -6,6 +6,7 @@ import type { components } from "./api.gen.js";
 
 export type Equipo = components["schemas"]["Equipo"];
 export type Vencido = components["schemas"]["Vencido"];
+export type EntradaHistorial = components["schemas"]["EntradaHistorial"];
 
 /** Colección con como mucho un préstamo activo por equipo, con id el id del equipo. */
 export const COLECCION_ACTIVOS = "prestamos_activos";
@@ -187,6 +188,31 @@ export async function listarVencidos(
       devolucion: activo.devolucion,
     }))
     .sort((a, b) => a.devolucion.localeCompare(b.devolucion) || a.nombre.localeCompare(b.nombre));
+}
+
+/** Documento de un préstamo en el historial: `creado` es la fecha de alta, que ordena el historial. */
+interface PrestamoGuardado {
+  idEquipo: string;
+  estado: EntradaHistorial["estado"];
+  persona: string;
+  devolucion: string;
+  creado?: string;
+}
+
+/**
+ * Todos los préstamos de un equipo (reservados, prestados y devueltos), del más reciente al más antiguo. Solo IT.
+ */
+export async function obtenerHistorial(
+  almacen: Almacen,
+  idEquipo: string,
+  sesion: { email: string } | null,
+): Promise<EntradaHistorial[]> {
+  exigirIT(sesion);
+  if ((await obtenerEquipo(almacen, idEquipo)) === undefined) throw new ErrorPrestamo(404, "No existe el equipo");
+  const prestamos = (await almacen.listar<PrestamoGuardado>(COLECCION_PRESTAMOS)).filter((prestamo) => prestamo.idEquipo === idEquipo);
+  return prestamos
+    .sort((a, b) => (b.creado ?? "").localeCompare(a.creado ?? "") || b.devolucion.localeCompare(a.devolucion))
+    .map((prestamo): EntradaHistorial => ({ persona: prestamo.persona, devolucion: prestamo.devolucion, estado: prestamo.estado }));
 }
 
 /** Los equipos con su estado: disponible sin préstamo activo; si no, el del préstamo activo con persona y devolución. */
