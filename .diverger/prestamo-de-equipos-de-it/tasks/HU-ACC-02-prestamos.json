@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "HU-ACC-02-prestamos",
   "title": "Préstamos: reservar las operaciones de IT a sus cuentas (HU-ACC-02)",
-  "status": "pending",
+  "status": "done",
   "story": "HU-ACC-02",
   "context": "prestamos",
   "modules": ["src/prestamos"],
