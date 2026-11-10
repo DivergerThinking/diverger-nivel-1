@@ -105,6 +105,31 @@ describe("alta de equipos (HU-INV-01)", () => {
     expect(await listarEquipos(almacen)).toEqual([]);
   });
 
+  it("una cuenta de IT con otras mayúsculas en el correo da de alta el equipo y queda disponible (HU-ACC-02)", async () => {
+    cuentas["itMayusculas"] = { email: "IT.Soporte@empresa.com", nombre: "IT" };
+    const { almacen, alta } = await montar();
+    const respuesta = await alta("itMayusculas", { nombre: "Proyector 02" });
+    expect(respuesta.statusCode).toBe(201);
+    const cuerpo = respuesta.json<{ id: string; nombre: string; estado: string }>();
+    expect({ nombre: cuerpo.nombre, estado: cuerpo.estado }).toEqual({ nombre: "Proyector 02", estado: "disponible" });
+    expect(await listarEquipos(almacen)).toEqual([{ id: cuerpo.id, nombre: "Proyector 02" }]);
+  });
+
+  it("la cuenta de servicio de CORREOS_IT da de alta equipos (HU-ACC-02)", async () => {
+    cuentas["inventario"] = { email: "inventario@empresa.com", nombre: "Inventario" };
+    const { alta } = await montar();
+    expect((await alta("inventario", { nombre: "Portátil 08" })).statusCode).toBe(201);
+  });
+
+  it("una cuenta con el mismo usuario en otra empresa recibe 403 y no se crea ningún equipo (HU-ACC-02)", async () => {
+    cuentas["otra"] = { email: "it.soporte@otra-empresa.com", nombre: "Otra" };
+    const { almacen, alta } = await montar();
+    const respuesta = await alta("otra", { nombre: "Proyector 02" });
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+    expect(await listarEquipos(almacen)).toEqual([]);
+  });
+
   it("sin CORREOS_IT nadie es de IT", async () => {
     vi.stubEnv("CORREOS_IT", "");
     const { alta } = await montar();
