@@ -3,11 +3,12 @@ import type { FastifyPluginAsync } from "fastify";
 import "../../lib/auth.js";
 import type { OpcionesContexto } from "../../lib/datos.js";
 import type { components } from "./api.gen.js";
-import { entregarEquipo, ErrorPrestamo, listarEquiposConEstado, solicitarEquipo } from "./prestamos.js";
+import { entregarEquipo, ErrorPrestamo, listarEquiposConEstado, prestarEquipo, solicitarEquipo } from "./prestamos.js";
 
 export { listarEquiposConEstado, type Equipo } from "./prestamos.js";
 
 type Solicitud = components["schemas"]["Solicitud"];
+type PrestamoMostrador = components["schemas"]["PrestamoMostrador"];
 
 /**
  * Rutas del contrato spec/contextos/prestamos/api.openapi.json. La sesión con Google la exige el servidor
@@ -29,6 +30,16 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     if (!request.persona) return respuesta.code(401).send({ error: "Inicia sesión con Google." });
     try {
       return await respuesta.code(200).send(await entregarEquipo(almacen, request.params.id, request.persona));
+    } catch (error) {
+      if (error instanceof ErrorPrestamo) return respuesta.code(error.codigo).send({ error: error.message });
+      throw error;
+    }
+  });
+  app.post<{ Params: { id: string }; Body: PrestamoMostrador | null }>("/api/equipos/:id/prestamo", async (request, respuesta) => {
+    if (!request.persona) return respuesta.code(401).send({ error: "Inicia sesión con Google." });
+    try {
+      const { persona, devolucion } = request.body ?? {};
+      return await respuesta.code(201).send(await prestarEquipo(almacen, request.params.id, request.persona, persona, devolucion));
     } catch (error) {
       if (error instanceof ErrorPrestamo) return respuesta.code(error.codigo).send({ error: error.message });
       throw error;
