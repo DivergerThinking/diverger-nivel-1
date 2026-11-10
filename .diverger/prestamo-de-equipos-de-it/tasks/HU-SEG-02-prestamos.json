@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "HU-SEG-02-prestamos",
   "title": "Préstamos: consultar el historial de un equipo (HU-SEG-02)",
-  "status": "pending",
+  "status": "done",
   "story": "HU-SEG-02",
   "context": "prestamos",
   "modules": ["src/prestamos"],

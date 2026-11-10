@@ -3,7 +3,7 @@ import type { FastifyPluginAsync } from "fastify";
 import "../../lib/auth.js";
 import type { OpcionesContexto } from "../../lib/datos.js";
 import type { components } from "./api.gen.js";
-import { devolverEquipo, entregarEquipo, ErrorPrestamo, listarEquiposConEstado, listarVencidos, prestarEquipo, solicitarEquipo } from "./prestamos.js";
+import { devolverEquipo, entregarEquipo, ErrorPrestamo, listarEquiposConEstado, listarVencidos, obtenerHistorial, prestarEquipo, solicitarEquipo } from "./prestamos.js";
 
 export { listarEquiposConEstado, type Equipo } from "./prestamos.js";
 
@@ -58,6 +58,15 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     if (!request.persona) return respuesta.code(401).send({ error: "Inicia sesión con Google." });
     try {
       return await respuesta.code(200).send(await listarVencidos(almacen, request.persona));
+    } catch (error) {
+      if (error instanceof ErrorPrestamo) return respuesta.code(error.codigo).send({ error: error.message });
+      throw error;
+    }
+  });
+  app.get<{ Params: { id: string } }>("/api/equipos/:id/historial", async (request, respuesta) => {
+    if (!request.persona) return respuesta.code(401).send({ error: "Inicia sesión con Google." });
+    try {
+      return await respuesta.code(200).send(await obtenerHistorial(almacen, request.params.id, request.persona));
     } catch (error) {
       if (error instanceof ErrorPrestamo) return respuesta.code(error.codigo).send({ error: error.message });
       throw error;
