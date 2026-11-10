@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "EN-PRE-01-prestamos",
+  "title": "Préstamos: evitar reservas y préstamos dobles simultáneos (EN-PRE-01)",
+  "status": "pending",
+  "story": "EN-PRE-01",
+  "context": "prestamos",
+  "modules": ["src/prestamos"],
+  "contracts": ["spec/contextos/prestamos/api.openapi.json"],
+  "dependsOn": ["HU-PRE-04-prestamos", "HU-PRE-01-prestamos", "HU-PRE-03-prestamos"]
+}

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "HU-PRE-04-prestamos",
+  "title": "Préstamos: apuntar la devolución de un equipo (HU-PRE-04)",
+  "status": "pending",
+  "story": "HU-PRE-04",
+  "context": "prestamos",
+  "modules": ["src/prestamos"],
+  "contracts": ["spec/contextos/prestamos/api.openapi.json"],
+  "dependsOn": ["HU-PRE-03-prestamos"]
+}
