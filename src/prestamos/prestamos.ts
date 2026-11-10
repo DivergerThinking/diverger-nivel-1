@@ -5,6 +5,7 @@ import { listarEquipos as listarEquiposDeEquipos, obtenerEquipo } from "../equip
 import type { components } from "./api.gen.js";
 
 export type Equipo = components["schemas"]["Equipo"];
+export type Vencido = components["schemas"]["Vencido"];
 
 /** Colección con como mucho un préstamo activo por equipo, con id el id del equipo. */
 export const COLECCION_ACTIVOS = "prestamos_activos";
@@ -163,6 +164,29 @@ export async function devolverEquipo(almacen: Almacen, idEquipo: string, sesion:
     tx.borrar(COLECCION_ACTIVOS, idEquipo);
   });
   return { id: equipo.id, nombre: equipo.nombre, estado: "disponible" };
+}
+
+/**
+ * Los equipos prestados con devolución anterior a hoy, del más antiguo al más reciente. Solo IT. Los reservados no
+ * cuentan y el que vence hoy todavía no está vencido.
+ */
+export async function listarVencidos(
+  almacen: Almacen,
+  sesion: { email: string } | null,
+  hoy: string = hoyEnMadrid(),
+): Promise<Vencido[]> {
+  exigirIT(sesion);
+  const activos = await almacen.listar<PrestamoActivo>(COLECCION_ACTIVOS);
+  const nombres = new Map((await listarEquiposDeEquipos(almacen)).map((equipo) => [equipo.id, equipo.nombre]));
+  return activos
+    .filter((activo) => activo.estado === "prestado" && activo.devolucion < hoy)
+    .map((activo): Vencido => ({
+      id: activo.idEquipo,
+      nombre: nombres.get(activo.idEquipo) ?? activo.idEquipo,
+      persona: activo.persona,
+      devolucion: activo.devolucion,
+    }))
+    .sort((a, b) => a.devolucion.localeCompare(b.devolucion) || a.nombre.localeCompare(b.nombre));
 }
 
 /** Los equipos con su estado: disponible sin préstamo activo; si no, el del préstamo activo con persona y devolución. */
