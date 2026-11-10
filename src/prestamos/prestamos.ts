@@ -111,6 +111,42 @@ export async function entregarEquipo(almacen: Almacen, idEquipo: string, sesion:
   return { id: equipo.id, nombre: equipo.nombre, estado: "prestado", persona: activo.persona, devolucion: activo.devolucion };
 }
 
+/**
+ * Presta en el mostrador un equipo disponible a la persona indicada. Solo IT. La fecha de devolución puede ser anterior
+ * a hoy (se apunta con retraso) y entonces el préstamo ya es vencido. El equipo se comprueba y se presta en una
+ * transacción para que dos peticiones a la vez no lo presten dos veces (ADR 0001).
+ */
+export async function prestarEquipo(
+  almacen: Almacen,
+  idEquipo: string,
+  sesion: { email: string } | null,
+  personaRecibida: unknown,
+  devolucionRecibida: unknown,
+): Promise<Equipo> {
+  exigirIT(sesion);
+  const equipo = await obtenerEquipo(almacen, idEquipo);
+  if (equipo === undefined) throw new ErrorPrestamo(404, "No existe el equipo");
+  const sinFecha = devolucionRecibida === undefined || devolucionRecibida === null || devolucionRecibida === "";
+  if (typeof personaRecibida !== "string" || personaRecibida.trim() === "" || sinFecha) {
+    throw new ErrorPrestamo(400, "Faltan la persona o la fecha de devolución");
+  }
+  if (typeof devolucionRecibida !== "string" || !esFechaReal(devolucionRecibida)) {
+    throw new ErrorPrestamo(400, "La fecha de devolución no es válida");
+  }
+  const persona = personaRecibida.trim();
+  const devolucion = devolucionRecibida;
+  const idPrestamo = randomUUID();
+  await almacen.transaccion(async (tx) => {
+    if ((await tx.obtener(COLECCION_ACTIVOS, idEquipo)) !== undefined) {
+      throw new ErrorPrestamo(409, "El equipo no está disponible");
+    }
+    const activo: PrestamoActivo = { idPrestamo, idEquipo, estado: "prestado", persona, devolucion };
+    tx.guardar(COLECCION_PRESTAMOS, idPrestamo, { ...activo, id: idPrestamo, creado: new Date().toISOString() });
+    tx.guardar(COLECCION_ACTIVOS, idEquipo, activo);
+  });
+  return { id: equipo.id, nombre: equipo.nombre, estado: "prestado", persona, devolucion };
+}
+
 /** Los equipos con su estado: disponible sin préstamo activo; si no, el del préstamo activo con persona y devolución. */
 export async function listarEquiposConEstado(almacen: Almacen): Promise<Equipo[]> {
   const equipos = await listarEquiposDeEquipos(almacen);

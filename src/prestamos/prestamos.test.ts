@@ -3,7 +3,7 @@ import { almacenEnMemoria } from "../../lib/datos.js";
 import { crearServidor } from "../../app/server.js";
 import { rutas as equipos } from "../equipos/index.js";
 import { listarEquiposConEstado, rutas } from "./index.js";
-import { entregarEquipo, ErrorPrestamo, esCuentaDeIT, exigirIT, solicitarEquipo } from "./prestamos.js";
+import { entregarEquipo, ErrorPrestamo, esCuentaDeIT, exigirIT, prestarEquipo, solicitarEquipo } from "./prestamos.js";
 
 const ana = { email: "ana.perez@empresa.com", nombre: "Ana" };
 const servidor = (almacen = almacenEnMemoria()) =>
@@ -379,6 +379,155 @@ describe("entregar un equipo reservado (HU-PRE-02)", () => {
   it("entregarEquipo sin sesión responde 403", async () => {
     const { almacen } = await montar();
     await expect(entregarEquipo(almacen, "e7", null)).rejects.toMatchObject({ codigo: 403, message: "Solo IT puede hacer esto." });
+  });
+});
+
+describe("prestar un equipo en el mostrador (HU-PRE-03)", () => {
+  const cuentas: Record<string, { email: string; nombre: string }> = {
+    it: { email: "it.soporte@empresa.com", nombre: "IT" },
+    ana: ana,
+  };
+  const montar = async () => {
+    const almacen = almacenEnMemoria();
+    await almacen.guardar("equipos_equipos", "e3", { id: "e3", nombre: "Monitor 03" });
+    await almacen.guardar("equipos_equipos", "e7", { id: "e7", nombre: "Portátil 07" });
+    const app = await crearServidor({
+      googleClientId: "cliente-app",
+      verificarToken: (token) => Promise.resolve(cuentas[token] ?? null),
+      almacen,
+      contextos: [equipos, rutas],
+    });
+    const prestar = (token: string, id: string, payload?: object) =>
+      app.inject({
+        method: "POST",
+        url: `/api/equipos/${id}/prestamo`,
+        headers: { authorization: `Bearer ${token}` },
+        ...(payload ? { payload } : {}),
+      });
+    return { almacen, prestar };
+  };
+  const disponible = { id: "e3", nombre: "Monitor 03", estado: "disponible" };
+
+  beforeEach(() => {
+    vi.stubEnv("CORREOS_IT", "it.soporte@empresa.com");
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("criterio 1: IT presta el equipo y queda prestado a la persona con la devolución indicada", async () => {
+    const { almacen, prestar } = await montar();
+    const respuesta = await prestar("it", "e3", { persona: ana.email, devolucion: "2026-11-20" });
+    expect(respuesta.statusCode).toBe(201);
+    const esperado = { id: "e3", nombre: "Monitor 03", estado: "prestado", persona: ana.email, devolucion: "2026-11-20" };
+    expect(respuesta.json()).toEqual(esperado);
+    expect(await listarEquiposConEstado(almacen)).toContainEqual(esperado);
+  });
+
+  it("criterio 2: una devolución anterior a hoy se acepta y el préstamo queda activo y prestado", async () => {
+    const { almacen, prestar } = await montar();
+    const respuesta = await prestar("it", "e3", { persona: "luis.gomez@empresa.com", devolucion: "2000-11-05" });
+    expect(respuesta.statusCode).toBe(201);
+    expect(respuesta.json()).toMatchObject({ estado: "prestado", devolucion: "2000-11-05" });
+    expect(await almacen.obtener("prestamos_activos", "e3")).toMatchObject({
+      estado: "prestado",
+      persona: "luis.gomez@empresa.com",
+      devolucion: "2000-11-05",
+    });
+  });
+
+  it("criterio 2: se guarda un préstamo con estado prestado", async () => {
+    const { almacen } = await montar();
+    await prestarEquipo(almacen, "e3", { email: "it.soporte@empresa.com" }, ana.email, "2026-11-05");
+    const prestamos = await almacen.listar<{ estado: string; idEquipo: string }>("prestamos_prestamos");
+    expect(prestamos).toEqual([expect.objectContaining({ estado: "prestado", idEquipo: "e3" })]);
+  });
+
+  it.each([
+    ["criterio 3: sin persona", { devolucion: "2026-11-20" }],
+    ["criterio 4: sin fecha de devolución", { persona: ana.email }],
+    ["sin persona ni fecha", {}],
+    ["con la persona vacía", { persona: "  ", devolucion: "2026-11-20" }],
+    ["con la persona que no es texto", { persona: 7, devolucion: "2026-11-20" }],
+  ])("%s responde 400 «Faltan la persona o la fecha de devolución» y el equipo sigue disponible", async (_caso, payload) => {
+    const { almacen, prestar } = await montar();
+    const respuesta = await prestar("it", "e3", payload);
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: "Faltan la persona o la fecha de devolución" });
+    expect(await listarEquiposConEstado(almacen)).toContainEqual(disponible);
+  });
+
+  it("sin cuerpo responde 400 «Faltan la persona o la fecha de devolución»", async () => {
+    const { prestar } = await montar();
+    const respuesta = await prestar("it", "e3");
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: "Faltan la persona o la fecha de devolución" });
+  });
+
+  it("criterio 5: un equipo que no existe responde 404 «No existe el equipo»", async () => {
+    const { prestar } = await montar();
+    const respuesta = await prestar("it", "no-existe", { persona: ana.email, devolucion: "2026-11-20" });
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it.each(["2026-02-30", "mañana", 20261120])(
+    "criterio 6: la devolución %j responde 400 «La fecha de devolución no es válida» y el equipo sigue disponible",
+    async (devolucion) => {
+      const { almacen, prestar } = await montar();
+      const respuesta = await prestar("it", "e3", { persona: ana.email, devolucion });
+      expect(respuesta.statusCode).toBe(400);
+      expect(respuesta.json()).toEqual({ error: "La fecha de devolución no es válida" });
+      expect(await listarEquiposConEstado(almacen)).toContainEqual(disponible);
+    },
+  );
+
+  it("criterio 7: un equipo reservado a otra persona responde 409 y su reserva no cambia", async () => {
+    const { almacen, prestar } = await montar();
+    const reserva = await solicitarEquipo(almacen, "e7", "luis.gomez@empresa.com", "2999-11-20");
+    const respuesta = await prestar("it", "e7", { persona: ana.email, devolucion: "2026-11-20" });
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está disponible" });
+    expect(await listarEquiposConEstado(almacen)).toContainEqual(reserva);
+  });
+
+  it("un equipo ya prestado responde 409 y dos préstamos a la vez solo prestan una vez", async () => {
+    const { almacen, prestar } = await montar();
+    const respuestas = await Promise.all([
+      prestar("it", "e3", { persona: ana.email, devolucion: "2026-11-20" }),
+      prestar("it", "e3", { persona: "luis.gomez@empresa.com", devolucion: "2026-11-21" }),
+    ]);
+    expect(respuestas.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+    expect(respuestas.find((r) => r.statusCode === 409)?.json()).toEqual({ error: "El equipo no está disponible" });
+    expect(await almacen.listar("prestamos_prestamos")).toHaveLength(1);
+  });
+
+  it("criterio 8: una cuenta que no es de IT recibe 403 «Solo IT puede hacer esto.» y el equipo sigue disponible", async () => {
+    const { almacen, prestar } = await montar();
+    const respuesta = await prestar("ana", "e3", { persona: ana.email, devolucion: "2026-11-20" });
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+    expect(await listarEquiposConEstado(almacen)).toContainEqual(disponible);
+  });
+
+  it("sin token responde 401 «Inicia sesión con Google.»", async () => {
+    const { almacen } = await montar();
+    const app = await servidor(almacen);
+    const respuesta = await app.inject({
+      method: "POST",
+      url: "/api/equipos/e3/prestamo",
+      payload: { persona: ana.email, devolucion: "2026-11-20" },
+    });
+    expect(respuesta.statusCode).toBe(401);
+    expect(respuesta.json()).toEqual({ error: "Inicia sesión con Google." });
+  });
+
+  it("prestarEquipo sin sesión responde 403", async () => {
+    const { almacen } = await montar();
+    await expect(prestarEquipo(almacen, "e3", null, ana.email, "2026-11-20")).rejects.toMatchObject({
+      codigo: 403,
+      message: "Solo IT puede hacer esto.",
+    });
   });
 });
 
