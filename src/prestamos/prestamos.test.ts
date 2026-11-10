@@ -37,6 +37,49 @@ describe("lista de equipos con su estado", () => {
   });
 });
 
+describe("GET /api/equipos con los tres estados (HU-INV-02)", () => {
+  it("una empleada con sesión ve disponible, prestado y reservado con persona y devolución", async () => {
+    const almacen = almacenEnMemoria();
+    await almacen.guardar("equipos_equipos", "e1", { id: "e1", nombre: "Portátil 07" });
+    await almacen.guardar("equipos_equipos", "e2", { id: "e2", nombre: "Monitor 03" });
+    await almacen.guardar("equipos_equipos", "e3", { id: "e3", nombre: "Proyector 02" });
+    await almacen.guardar("prestamos_activos", "e2", {
+      idPrestamo: "p2",
+      idEquipo: "e2",
+      estado: "prestado",
+      persona: "luis.gomez@empresa.com",
+      devolucion: "2026-11-20",
+    });
+    await almacen.guardar("prestamos_activos", "e3", {
+      idPrestamo: "p3",
+      idEquipo: "e3",
+      estado: "reservado",
+      persona: "luis.gomez@empresa.com",
+      devolucion: "2026-11-18",
+    });
+    const app = await servidor(almacen);
+    const respuesta = await app.inject({ method: "GET", url: "/api/equipos", headers: { authorization: "Bearer valido" } });
+    expect(respuesta.statusCode).toBe(200);
+    const lista = respuesta.json<{ id: string }[]>();
+    expect(lista).toHaveLength(3);
+    expect(lista.find((e) => e.id === "e1")).toEqual({ id: "e1", nombre: "Portátil 07", estado: "disponible" });
+    expect(lista.find((e) => e.id === "e2")).toEqual({
+      id: "e2",
+      nombre: "Monitor 03",
+      estado: "prestado",
+      persona: "luis.gomez@empresa.com",
+      devolucion: "2026-11-20",
+    });
+    expect(lista.find((e) => e.id === "e3")).toEqual({
+      id: "e3",
+      nombre: "Proyector 02",
+      estado: "reservado",
+      persona: "luis.gomez@empresa.com",
+      devolucion: "2026-11-18",
+    });
+  });
+});
+
 describe("operaciones de IT reservadas a CORREOS_IT (HU-ACC-02)", () => {
   const cuentas: Record<string, { email: string; nombre: string }> = {
     it: { email: "IT.Soporte@empresa.com", nombre: "IT" },
