@@ -91,6 +91,26 @@ export async function solicitarEquipo(
   return { id: equipo.id, nombre: equipo.nombre, estado: "reservado", persona, devolucion };
 }
 
+/**
+ * Entrega un equipo reservado: pasa a prestado con la misma persona y devolución de la solicitud. Solo IT. La reserva
+ * se lee y se cambia en una transacción para que dos entregas a la vez no la cambien dos veces.
+ */
+export async function entregarEquipo(almacen: Almacen, idEquipo: string, sesion: { email: string } | null): Promise<Equipo> {
+  exigirIT(sesion);
+  const equipo = await obtenerEquipo(almacen, idEquipo);
+  if (equipo === undefined) throw new ErrorPrestamo(404, "No existe el equipo");
+  const activo = await almacen.transaccion(async (tx) => {
+    const actual = await tx.obtener<PrestamoActivo>(COLECCION_ACTIVOS, idEquipo);
+    if (actual?.estado !== "reservado") throw new ErrorPrestamo(409, "El equipo no está reservado");
+    const prestado: PrestamoActivo = { ...actual, estado: "prestado" };
+    const prestamo = await tx.obtener<Record<string, unknown>>(COLECCION_PRESTAMOS, actual.idPrestamo);
+    tx.guardar(COLECCION_PRESTAMOS, actual.idPrestamo, { ...(prestamo ?? { ...actual, id: actual.idPrestamo }), estado: "prestado" });
+    tx.guardar(COLECCION_ACTIVOS, idEquipo, prestado);
+    return prestado;
+  });
+  return { id: equipo.id, nombre: equipo.nombre, estado: "prestado", persona: activo.persona, devolucion: activo.devolucion };
+}
+
 /** Los equipos con su estado: disponible sin préstamo activo; si no, el del préstamo activo con persona y devolución. */
 export async function listarEquiposConEstado(almacen: Almacen): Promise<Equipo[]> {
   const equipos = await listarEquiposDeEquipos(almacen);
