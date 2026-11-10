@@ -1,0 +1,87 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Contexto Alfa",
+    "version": "1.0.0",
+    "description": "Saludo del contexto alfa (prueba de paralelismo, harness#703)."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "security": [
+    {
+      "google": []
+    }
+  ],
+  "paths": {
+    "/api/alfa/saludo": {
+      "get": {
+        "operationId": "saludoAlfa",
+        "summary": "Saludo del contexto alfa para la persona que ha iniciado sesión",
+        "responses": {
+          "200": {
+            "description": "Saludo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Saludo"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el inicio de sesión o el token no es válido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "google": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Token de identidad de Google (Google Identity Services)"
+      }
+    },
+    "schemas": {
+      "Saludo": {
+        "type": "object",
+        "required": [
+          "contexto",
+          "persona"
+        ],
+        "properties": {
+          "contexto": {
+            "type": "string",
+            "const": "alfa"
+          },
+          "persona": {
+            "type": "string"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
