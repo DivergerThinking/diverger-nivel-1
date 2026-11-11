@@ -18,5 +18,6 @@
     "requirementPrefix": "RQ.",
     "sprintZero": true
   },
-  "maxCodeWorkers": 3
+  "maxCodeWorkers": 3,
+  "pruebaTa169": true
 }
