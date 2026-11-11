@@ -1,0 +1,26 @@
+flowchart LR
+    HU_SOL_01["HU-SOL-01 · Ver los equipos y su estado · publicada"]
+    HU_SOL_02["HU-SOL-02 · Pedir un equipo disponible · publicada"]
+    HU_SOL_03["HU-SOL-03 · Validar la fecha de devolución de una solicitud · publicada"]
+    HU_GES_01["HU-GES-01 · Dar de alta un equipo · publicada"]
+    HU_GES_02["HU-GES-02 · Entregar un equipo reservado · publicada"]
+    HU_GES_03["HU-GES-03 · Prestar un equipo en el mostrador · publicada"]
+    HU_GES_04["HU-GES-04 · Apuntar la devolución de un equipo · publicada"]
+    HU_SEG_01["HU-SEG-01 · Ver los préstamos vencidos · publicada"]
+    HU_SEG_02["HU-SEG-02 · Consultar el historial de un equipo · publicada"]
+    HU_ACC_01["HU-ACC-01 · Entrar con la cuenta de Google de la empresa · publicada"]
+    HU_ACC_02["HU-ACC-02 · Reservar las operaciones de IT a las cuentas de IT · publicada"]
+    HU_GES_01 --> HU_SOL_01
+    HU_ACC_01 --> HU_SOL_01
+    HU_GES_01 --> HU_SOL_02
+    HU_ACC_01 --> HU_SOL_02
+    HU_SOL_02 --> HU_SOL_03
+    HU_ACC_02 --> HU_GES_01
+    HU_SOL_02 --> HU_GES_02
+    HU_GES_01 --> HU_GES_03
+    HU_GES_03 --> HU_GES_04
+    HU_GES_03 --> HU_SEG_01
+    HU_GES_04 --> HU_SEG_02
+    HU_ACC_01 --> HU_ACC_02
+    classDef published fill:#e8f5e9,stroke:#43a047,color:#1b5e20
+    class HU_SOL_01,HU_SOL_02,HU_SOL_03,HU_GES_01,HU_GES_02,HU_GES_03,HU_GES_04,HU_SEG_01,HU_SEG_02,HU_ACC_01,HU_ACC_02 published

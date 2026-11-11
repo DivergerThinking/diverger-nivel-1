@@ -1,0 +1,6 @@
+stateDiagram-v2
+    [*] --> disponible: alta
+    disponible --> reservado: solicitud
+    reservado --> prestado: entrega
+    disponible --> prestado: prestamo en el mostrador
+    prestado --> disponible: devolucion
