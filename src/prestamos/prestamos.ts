@@ -148,6 +148,28 @@ export async function prestarEquipo(
 }
 
 /**
+ * Devolución de un equipo prestado: lo deja disponible, sin persona ni devolución, y su préstamo pasa a devuelto
+ * (el historial lo muestra así). Solo se devuelve un equipo prestado; el estado se lee y se escribe en una
+ * transacción.
+ */
+export async function devolverEquipo(almacen: Almacen, id: string): Promise<Equipo> {
+  const equipo = await obtenerEquipo(almacen, id);
+  if (!equipo) throw new ErrorPrestamos(404, "No existe el equipo");
+
+  return almacen.transaccion(async (tx) => {
+    const actual = await tx.obtener<EstadoGuardado>(COLECCION_ESTADOS, id);
+    if (actual?.estado !== "prestado") throw new ErrorPrestamos(409, "El equipo no está prestado");
+    // Firestore exige todas las lecturas antes de la primera escritura.
+    const prestamo =
+      actual.prestamoId === undefined ? undefined : await tx.obtener<Prestamo>(COLECCION_PRESTAMOS, actual.prestamoId);
+    const nuevo: EstadoGuardado = { estado: "disponible" };
+    tx.guardar(COLECCION_ESTADOS, id, nuevo);
+    if (prestamo) tx.guardar(COLECCION_PRESTAMOS, prestamo.id, { ...prestamo, estado: "devuelto" });
+    return equipoConEstado(id, equipo.nombre, nuevo);
+  });
+}
+
+/**
  * Entrega de un equipo reservado: lo deja prestado con la misma persona y fecha de devolución, y su préstamo
  * pasa a prestado. Solo se entrega un equipo reservado; el estado se lee y se escribe en una transacción.
  */
