@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "HU-SOL-02-prestamos",
   "title": "Préstamos: pedir un equipo disponible (HU-SOL-02)",
-  "status": "pending",
+  "status": "done",
   "story": "HU-SOL-02",
   "context": "prestamos",
   "modules": ["src/prestamos"],
