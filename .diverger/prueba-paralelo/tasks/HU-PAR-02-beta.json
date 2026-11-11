@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "HU-PAR-02-beta",
   "title": "Beta: saludo del contexto (HU-PAR-02)",
-  "status": "pending",
+  "status": "done",
   "story": "HU-PAR-02",
   "context": "beta",
   "modules": [

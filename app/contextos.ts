@@ -2,8 +2,9 @@
 // Cada contexto recibe en sus opciones el almacén de datos (lib/datos.ts): es su única vía a la base.
 import type { FastifyPluginAsync } from "fastify";
 import type { OpcionesContexto } from "../lib/datos.js";
+import { rutas as beta } from "../src/beta/index.js";
 import { rutas as ejemplo } from "../src/ejemplo/index.js";
 import { rutas as equipos } from "../src/equipos/index.js";
 import { rutas as prestamos } from "../src/prestamos/index.js";
 
-export const contextos: FastifyPluginAsync<OpcionesContexto>[] = [ejemplo, equipos, prestamos];
+export const contextos: FastifyPluginAsync<OpcionesContexto>[] = [beta, ejemplo, equipos, prestamos];
