@@ -162,6 +162,72 @@ describe("rutas con sesión de Google (HU-ACC-01)", () => {
     await app.close();
   });
 
+  it("HU-SOL-02 criterio 1: la solicitud da 201 con el equipo reservado y la lista lo muestra así", async () => {
+    const app = await servidor(await conPortatil());
+    const respuesta = await app.inject({
+      method: "POST",
+      url: "/api/equipos/pc-07/solicitud",
+      headers,
+      payload: { devolucion: "2999-11-20" },
+    });
+    const reservado = { id: "pc-07", nombre: "Portátil 07", estado: "reservado", persona: ANA.email, devolucion: "2999-11-20" };
+    expect(respuesta.statusCode).toBe(201);
+    expect(respuesta.json()).toEqual(reservado);
+    const lista = await app.inject({ url: "/api/equipos", headers });
+    expect(lista.json()).toEqual([reservado]);
+    await app.close();
+  });
+
+  it("HU-SOL-02 criterio 2: un equipo reservado a otra persona da 409 y sigue reservado a ella", async () => {
+    const almacen = await conPortatil();
+    await almacen.guardar("prestamos_estados", "pc-07", {
+      estado: "reservado",
+      persona: "luis.gomez@empresa.com",
+      devolucion: "2999-11-20",
+      prestamoId: "p-1",
+    });
+    const app = await servidor(almacen);
+    const respuesta = await app.inject({
+      method: "POST",
+      url: "/api/equipos/pc-07/solicitud",
+      headers,
+      payload: { devolucion: "2999-11-20" },
+    });
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está disponible" });
+    const lista = await app.inject({ url: "/api/equipos", headers });
+    expect(lista.json()).toEqual([
+      { id: "pc-07", nombre: "Portátil 07", estado: "reservado", persona: "luis.gomez@empresa.com", devolucion: "2999-11-20" },
+    ]);
+    await app.close();
+  });
+
+  it("HU-SOL-02 criterio 3: dos solicitudes a la vez dan un 201 y un 409, y el equipo queda reservado a una sola persona", async () => {
+    const almacen = await conPortatil();
+    const app = await servidor(almacen);
+    const pedir = () =>
+      app.inject({ method: "POST", url: "/api/equipos/pc-07/solicitud", headers, payload: { devolucion: "2999-11-20" } });
+    const respuestas = await Promise.all([pedir(), pedir()]);
+    expect(respuestas.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+    const rechazada = respuestas.find((r) => r.statusCode === 409);
+    expect(rechazada?.json()).toEqual({ error: "El equipo no está disponible" });
+    expect(await almacen.listar("prestamos_prestamos")).toHaveLength(1);
+    await app.close();
+  });
+
+  it("HU-SOL-02 criterio 4: un equipo que no existe da 404 «No existe el equipo»", async () => {
+    const app = await servidor(await conPortatil());
+    const respuesta = await app.inject({
+      method: "POST",
+      url: "/api/equipos/no-existe/solicitud",
+      headers,
+      payload: { devolucion: "2999-11-20" },
+    });
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
+    await app.close();
+  });
+
   it("traduce los errores de la solicitud a su código y mensaje", async () => {
     const app = await servidor(await conPortatil());
     const sinFecha = await app.inject({ method: "POST", url: "/api/equipos/pc-07/solicitud", headers, payload: {} });
