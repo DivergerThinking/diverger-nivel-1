@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "EN-ACC-01-prestamos",
   "title": "Préstamos: pruebas de contrato de la API del inventario (EN-ACC-01)",
-  "status": "pending",
+  "status": "done",
   "story": "EN-ACC-01",
   "context": "prestamos",
   "modules": ["src/prestamos"],
