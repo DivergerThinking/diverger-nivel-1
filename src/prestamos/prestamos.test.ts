@@ -44,6 +44,33 @@ describe("listarEquiposConEstado", () => {
       { id: "pc-07", nombre: "Portátil 07", estado: "disponible" },
     ]);
   });
+
+  it("HU-SOL-01 criterio 1: muestra la persona y la devolución solo de los equipos prestados", async () => {
+    const almacen = await conPortatil();
+    await almacen.guardar("equipos_equipos", "pr-02", { id: "pr-02", nombre: "Proyector 02" });
+    await almacen.guardar("prestamos_estados", "pr-02", {
+      estado: "prestado",
+      persona: "luis.gomez@empresa.com",
+      devolucion: "2026-11-20",
+      prestamoId: "p-1",
+    });
+    expect(await listarEquiposConEstado(almacen)).toEqual([
+      { id: "pc-07", nombre: "Portátil 07", estado: "disponible" },
+      {
+        id: "pr-02",
+        nombre: "Proyector 02",
+        estado: "prestado",
+        persona: "luis.gomez@empresa.com",
+        devolucion: "2026-11-20",
+      },
+    ]);
+  });
+
+  it("no muestra persona ni devolución de un equipo devuelto", async () => {
+    const almacen = await conPortatil();
+    await almacen.guardar("prestamos_estados", "pc-07", { estado: "disponible" });
+    expect(await listarEquiposConEstado(almacen)).toEqual([{ id: "pc-07", nombre: "Portátil 07", estado: "disponible" }]);
+  });
 });
 
 describe("solicitarEquipo", () => {
@@ -100,6 +127,25 @@ describe("rutas con sesión de Google (HU-ACC-01)", () => {
     const respuesta = await app.inject({ url: "/api/equipos", headers });
     expect(respuesta.statusCode).toBe(200);
     expect(respuesta.json()).toEqual([{ id: "pc-07", nombre: "Portátil 07", estado: "disponible" }]);
+    await app.close();
+  });
+
+  it("HU-SOL-01: GET /api/equipos lista disponibles y prestados con sus campos", async () => {
+    const almacen = await conPortatil();
+    await almacen.guardar("equipos_equipos", "pr-02", { id: "pr-02", nombre: "Proyector 02" });
+    await almacen.guardar("prestamos_estados", "pr-02", {
+      estado: "prestado",
+      persona: "luis.gomez@empresa.com",
+      devolucion: "2026-11-20",
+      prestamoId: "p-1",
+    });
+    const app = await servidor(almacen);
+    const respuesta = await app.inject({ url: "/api/equipos", headers });
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual([
+      { id: "pc-07", nombre: "Portátil 07", estado: "disponible" },
+      { id: "pr-02", nombre: "Proyector 02", estado: "prestado", persona: "luis.gomez@empresa.com", devolucion: "2026-11-20" },
+    ]);
     await app.close();
   });
 
