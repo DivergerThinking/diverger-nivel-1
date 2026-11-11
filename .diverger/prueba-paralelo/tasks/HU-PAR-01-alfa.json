@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "HU-PAR-01-alfa",
+  "title": "Alfa: saludo del contexto (HU-PAR-01)",
+  "status": "pending",
+  "story": "HU-PAR-01",
+  "context": "alfa",
+  "modules": [
+    "src/alfa"
+  ],
+  "contracts": [
+    "spec/contextos/alfa/api.openapi.json"
+  ],
+  "dependsOn": []
+}

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "initiative": "prestamo-de-equipos-de-it",
+  "initiative": "prueba-paralelo",
   "status": "approved",
   "checks": {
     "constitution": {
@@ -9,63 +9,69 @@
       "notes": []
     }
   },
+  "approved": {
+    "at": "2026-11-10T21:00:00Z",
+    "contracts": {
+      "spec/contextos/alfa/api.openapi.json": "1.0.0",
+      "spec/contextos/beta/api.openapi.json": "1.0.0",
+      "spec/contextos/gamma/api.openapi.json": "1.0.0"
+    },
+    "lastAdr": 4
+  },
   "contexts": [
     {
-      "id": "equipos",
-      "name": "Equipos",
-      "path": "spec/contextos/equipos/",
-      "module": "src/equipos",
+      "id": "alfa",
+      "name": "Alfa",
+      "path": "spec/contextos/alfa/",
+      "module": "src/alfa",
       "stories": [
-        "HU-ACC-01",
-        "HU-ACC-02",
-        "HU-INV-01"
+        "HU-PAR-01"
       ],
       "dependsOn": [],
       "contracts": [
         {
           "kind": "openapi",
-          "path": "spec/contextos/equipos/api.openapi.json"
+          "path": "spec/contextos/alfa/api.openapi.json"
         }
       ],
       "publishes": [],
       "subscribes": []
     },
     {
-      "id": "prestamos",
-      "name": "Préstamos",
-      "path": "spec/contextos/prestamos/",
-      "module": "src/prestamos",
+      "id": "beta",
+      "name": "Beta",
+      "path": "spec/contextos/beta/",
+      "module": "src/beta",
       "stories": [
-        "HU-ACC-01",
-        "HU-ACC-02",
-        "HU-INV-02",
-        "HU-PRE-01",
-        "HU-PRE-02",
-        "HU-PRE-03",
-        "HU-PRE-04",
-        "EN-PRE-01",
-        "HU-SEG-01",
-        "HU-SEG-02"
+        "HU-PAR-02"
       ],
-      "dependsOn": [
-        "equipos"
-      ],
+      "dependsOn": [],
       "contracts": [
         {
           "kind": "openapi",
-          "path": "spec/contextos/prestamos/api.openapi.json"
+          "path": "spec/contextos/beta/api.openapi.json"
+        }
+      ],
+      "publishes": [],
+      "subscribes": []
+    },
+    {
+      "id": "gamma",
+      "name": "Gamma",
+      "path": "spec/contextos/gamma/",
+      "module": "src/gamma",
+      "stories": [
+        "HU-PAR-03"
+      ],
+      "dependsOn": [],
+      "contracts": [
+        {
+          "kind": "openapi",
+          "path": "spec/contextos/gamma/api.openapi.json"
         }
       ],
       "publishes": [],
       "subscribes": []
     }
-  ],
-  "approved": {
-    "at": "2026-11-09T23:46:31Z",
-    "contracts": {
-      "spec/contextos/equipos/api.openapi.json": "1.0.0",
-      "spec/contextos/prestamos/api.openapi.json": "1.0.0"
-    },
-    "lastAdr": 4
-  }
+  ]
 }

@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "initiative": {
+    "id": "prueba-paralelo",
+    "title": "Prueba de tres workers a la vez",
+    "vision": "Comprobar que el bucle desatendido lanza tres workers de código a la vez sin pasar de tres.",
+    "language": "es",
+    "delivery": {
+      "mode": "manual"
+    },
+    "summary": "Tres contextos independientes con una ruta de saludo cada uno (#703 del harness).",
+    "requirements": [
+      {
+        "id": "RQ.001",
+        "title": "Cada contexto responde a su ruta de saludo",
+        "type": "Funcional",
+        "source": "harness#703"
+      }
+    ],
+    "conventions": {
+      "areas": {
+        "PAR": "Paralelismo"
+      }
+    }
+  },
+  "epics": [
+    {
+      "id": "EP-01",
+      "title": "Contextos independientes",
+      "stories": [
+        "HU-PAR-01",
+        "HU-PAR-02",
+        "HU-PAR-03"
+      ]
+    }
+  ],
+  "stories": [
+    {
+      "id": "HU-PAR-01",
+      "kind": "story",
+      "epic": "EP-01",
+      "title": "Saludo del contexto Alfa",
+      "role": "empleado",
+      "goal": "pedir el saludo del contexto Alfa",
+      "benefit": "comprobar que el contexto responde",
+      "requirements": [
+        "RQ.001"
+      ],
+      "acceptanceCriteria": [
+        {
+          "type": "positive",
+          "given": "la empleada «ana.perez@empresa.com» con sesión iniciada",
+          "when": "pide GET /api/alfa/saludo",
+          "then": "recibe 200 con {\"contexto\": \"alfa\", \"persona\": \"ana.perez@empresa.com\"}"
+        },
+        {
+          "type": "negative",
+          "given": "una petición sin token",
+          "when": "pide GET /api/alfa/saludo",
+          "then": "recibe 401 con {\"error\": \"Inicia sesión con Google.\"}"
+        }
+      ],
+      "priority": "must",
+      "estimate": {
+        "size": "S",
+        "hours": 1
+      },
+      "storyPoints": 1,
+      "status": "approved",
+      "sprint": "SP-01",
+      "blockedBy": [],
+      "context": "Prueba del paralelismo (#703 del harness): el contexto alfa no depende de ningún otro.",
+      "notes": "",
+      "definitionOfDone": "Criterios de aceptación probados."
+    },
+    {
+      "id": "HU-PAR-02",
+      "kind": "story",
+      "epic": "EP-01",
+      "title": "Saludo del contexto Beta",
+      "role": "empleado",
+      "goal": "pedir el saludo del contexto Beta",
+      "benefit": "comprobar que el contexto responde",
+      "requirements": [
+        "RQ.001"
+      ],
+      "acceptanceCriteria": [
+        {
+          "type": "positive",
+          "given": "la empleada «ana.perez@empresa.com» con sesión iniciada",
+          "when": "pide GET /api/beta/saludo",
+          "then": "recibe 200 con {\"contexto\": \"beta\", \"persona\": \"ana.perez@empresa.com\"}"
+        },
+        {
+          "type": "negative",
+          "given": "una petición sin token",
+          "when": "pide GET /api/beta/saludo",
+          "then": "recibe 401 con {\"error\": \"Inicia sesión con Google.\"}"
+        }
+      ],
+      "priority": "must",
+      "estimate": {
+        "size": "S",
+        "hours": 1
+      },
+      "storyPoints": 1,
+      "status": "approved",
+      "sprint": "SP-01",
+      "blockedBy": [],
+      "context": "Prueba del paralelismo (#703 del harness): el contexto beta no depende de ningún otro.",
+      "notes": "",
+      "definitionOfDone": "Criterios de aceptación probados."
+    },
+    {
+      "id": "HU-PAR-03",
+      "kind": "story",
+      "epic": "EP-01",
+      "title": "Saludo del contexto Gamma",
+      "role": "empleado",
+      "goal": "pedir el saludo del contexto Gamma",
+      "benefit": "comprobar que el contexto responde",
+      "requirements": [
+        "RQ.001"
+      ],
+      "acceptanceCriteria": [
+        {
+          "type": "positive",
+          "given": "la empleada «ana.perez@empresa.com» con sesión iniciada",
+          "when": "pide GET /api/gamma/saludo",
+          "then": "recibe 200 con {\"contexto\": \"gamma\", \"persona\": \"ana.perez@empresa.com\"}"
+        },
+        {
+          "type": "negative",
+          "given": "una petición sin token",
+          "when": "pide GET /api/gamma/saludo",
+          "then": "recibe 401 con {\"error\": \"Inicia sesión con Google.\"}"
+        }
+      ],
+      "priority": "must",
+      "estimate": {
+        "size": "S",
+        "hours": 1
+      },
+      "storyPoints": 1,
+      "status": "approved",
+      "sprint": "SP-01",
+      "blockedBy": [],
+      "context": "Prueba del paralelismo (#703 del harness): el contexto gamma no depende de ningún otro.",
+      "notes": "",
+      "definitionOfDone": "Criterios de aceptación probados."
+    }
+  ],
+  "tasks": [],
+  "team": [],
+  "sprints": [],
+  "assumptions": [],
+  "openQuestions": []
+}
