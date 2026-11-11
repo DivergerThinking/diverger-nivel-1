@@ -228,6 +228,46 @@ describe("rutas con sesión de Google (HU-ACC-01)", () => {
     await app.close();
   });
 
+  it("HU-SOL-03 criterio 1: la devolución de hoy se acepta y se devuelve tal cual la envió", async () => {
+    const hoy = hoyEnMadrid();
+    const app = await servidor(await conPortatil());
+    const respuesta = await app.inject({
+      method: "POST",
+      url: "/api/equipos/pc-07/solicitud",
+      headers,
+      payload: { devolucion: hoy },
+    });
+    expect(respuesta.statusCode).toBe(201);
+    expect(respuesta.json()).toEqual({ id: "pc-07", nombre: "Portátil 07", estado: "reservado", persona: ANA.email, devolucion: hoy });
+    await app.close();
+  });
+
+  it.each([
+    ["criterio 2", { devolucion: "2000-01-01" }, "La fecha de devolución ya ha pasado"],
+    ["criterio 3", { devolucion: "2026-02-30" }, "La fecha de devolución no es válida"],
+    ["criterio 4", {}, "Falta la fecha de devolución"],
+  ])("HU-SOL-03 %s: da 400 «%s» y el equipo sigue disponible", async (_criterio, payload, mensaje) => {
+    const almacen = await conPortatil();
+    const app = await servidor(almacen);
+    const respuesta = await app.inject({ method: "POST", url: "/api/equipos/pc-07/solicitud", headers, payload });
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: mensaje });
+    const lista = await app.inject({ url: "/api/equipos", headers });
+    expect(lista.json()).toEqual([{ id: "pc-07", nombre: "Portátil 07", estado: "disponible" }]);
+    expect(await almacen.listar("prestamos_prestamos")).toHaveLength(0);
+    await app.close();
+  });
+
+  it("HU-SOL-03: el día de hoy no ha pasado y el de ayer sí", async () => {
+    const almacen = await conPortatil();
+    const equipo = await solicitarEquipo(almacen, "pc-07", ANA.email, "2026-11-11", "2026-11-11");
+    expect(equipo.devolucion).toBe("2026-11-11");
+    await expect(solicitarEquipo(await conPortatil(), "pc-07", ANA.email, "2026-11-10", "2026-11-11")).rejects.toMatchObject({
+      codigo: 400,
+      message: "La fecha de devolución ya ha pasado",
+    });
+  });
+
   it("traduce los errores de la solicitud a su código y mensaje", async () => {
     const app = await servidor(await conPortatil());
     const sinFecha = await app.inject({ method: "POST", url: "/api/equipos/pc-07/solicitud", headers, payload: {} });

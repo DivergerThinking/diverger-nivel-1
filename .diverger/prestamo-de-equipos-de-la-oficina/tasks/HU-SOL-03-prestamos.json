@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "HU-SOL-03-prestamos",
   "title": "Préstamos: validar la fecha de devolución de una solicitud (HU-SOL-03)",
-  "status": "pending",
+  "status": "done",
   "story": "HU-SOL-03",
   "context": "prestamos",
   "modules": ["src/prestamos"],
