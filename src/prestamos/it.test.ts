@@ -19,7 +19,6 @@ async function servidor(email: string | null): Promise<FastifyInstance> {
   // para las que faltan, para comprobar que el hook las protege.
   await app.register(async (contexto) => {
     await rutas(contexto, { almacen: almacenEnMemoria() });
-    contexto.get("/api/prestamos/vencidos", () => []);
     contexto.get("/api/equipos/:id/historial", () => []);
   });
   return app;
@@ -72,6 +71,25 @@ describe("operaciones de IT en las rutas (HU-ACC-02)", () => {
       const respuesta = await app.inject({ method, url, payload: method === "POST" ? {} : undefined });
       expect(respuesta.statusCode).toBe(403);
       expect(respuesta.json()).toEqual(SOLO_IT);
+      await app.close();
+    });
+  }
+
+  const camufladas = [
+    { method: "GET", url: "/api/prestamos/venc%69dos" },
+    { method: "HEAD", url: "/api/prestamos/vencidos" },
+    { method: "POST", url: "/api/equipos/pc-07/entr%65ga" },
+    { method: "POST", url: "/api/equipos/pc-07/pr%65stamo" },
+    { method: "POST", url: "/api/equipos/pc-07/dev%6flucion" },
+    { method: "GET", url: "/api/equipos/pc-07/hist%6frial" },
+  ] as const;
+
+  for (const { method, url } of camufladas) {
+    it(`${method} ${url} (URL codificada o HEAD) también da 403 a una cuenta que no es de IT`, async () => {
+      vi.stubEnv("CORREOS_IT", "it@empresa.com");
+      const app = await servidor("ana.perez@empresa.com");
+      const respuesta = await app.inject({ method, url, payload: method === "POST" ? {} : undefined });
+      expect(respuesta.statusCode).toBe(403);
       await app.close();
     });
   }

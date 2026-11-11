@@ -5,6 +5,7 @@ import { listarEquipos as listarEquiposDados, obtenerEquipo } from "../equipos/i
 import type { components } from "./api.gen.js";
 
 export type Equipo = components["schemas"]["Equipo"];
+export type Vencido = components["schemas"]["Vencido"];
 type Estado = components["schemas"]["Estado"];
 
 /** Colección con un documento por equipo, con id el del equipo. */
@@ -74,6 +75,21 @@ export async function listarEquiposConEstado(almacen: Almacen): Promise<Equipo[]
     if (guardado) estados.set(equipo.id, guardado);
   }
   return equipos.map((equipo) => equipoConEstado(equipo.id, equipo.nombre, estados.get(equipo.id)));
+}
+
+/**
+ * Préstamos vencidos: los equipos prestados con fecha de devolución anterior a hoy (el día de Madrid), del más
+ * antiguo al más reciente. Un equipo reservado no cuenta.
+ */
+export async function listarVencidos(almacen: Almacen, hoy: string = hoyEnMadrid()): Promise<Vencido[]> {
+  const equipos = await listarEquiposConEstado(almacen);
+  const vencidos: Vencido[] = [];
+  for (const equipo of equipos) {
+    if (equipo.estado !== "prestado") continue;
+    if (equipo.persona === undefined || equipo.devolucion === undefined || equipo.devolucion >= hoy) continue;
+    vencidos.push({ id: equipo.id, nombre: equipo.nombre, persona: equipo.persona, devolucion: equipo.devolucion });
+  }
+  return vencidos.sort((a, b) => a.devolucion.localeCompare(b.devolucion) || a.nombre.localeCompare(b.nombre));
 }
 
 /**

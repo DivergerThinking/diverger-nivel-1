@@ -10,6 +10,7 @@ import {
   entregarEquipo,
   ErrorPrestamos,
   listarEquiposConEstado,
+  listarVencidos,
   prestarEquipo,
   solicitarEquipo,
 } from "./prestamos.js";
@@ -25,7 +26,10 @@ type PrestamoMostrador = components["schemas"]["PrestamoMostrador"];
 export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) => {
   // Las operaciones de IT son solo de las cuentas de CORREOS_IT: se comprueba antes de leer o escribir nada.
   app.addHook("onRequest", (request, reply) => {
-    if (!esOperacionDeIT(request.method, request.url)) return Promise.resolve();
+    // Se decide con la ruta ya resuelta por el router (no con la URL cruda, que puede ir codificada: «venc%69dos»)
+    // y HEAD, que Fastify sirve con las rutas GET, cuenta como GET.
+    const metodo = request.method === "HEAD" ? "GET" : request.method;
+    if (!esOperacionDeIT(metodo, request.routeOptions.url ?? "")) return Promise.resolve();
     const persona = request.persona;
     if (!persona) return reply.code(401).send({ error: "Inicia sesión con Google." });
     if (!esCuentaDeIT(persona.email)) return reply.code(403).send({ error: MENSAJE_SOLO_IT });
@@ -33,6 +37,8 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
   });
 
   app.get("/api/equipos", () => listarEquiposConEstado(almacen));
+
+  app.get("/api/prestamos/vencidos", () => listarVencidos(almacen));
 
   app.post<{ Params: { id: string }; Body: Solicitud | null }>("/api/equipos/:id/solicitud", async (request, reply) => {
     const persona = request.persona;
