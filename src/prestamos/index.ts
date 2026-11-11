@@ -11,6 +11,7 @@ import {
   ErrorPrestamos,
   listarEquiposConEstado,
   listarVencidos,
+  obtenerHistorial,
   prestarEquipo,
   solicitarEquipo,
 } from "./prestamos.js";
@@ -39,6 +40,15 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
   app.get("/api/equipos", () => listarEquiposConEstado(almacen));
 
   app.get("/api/prestamos/vencidos", () => listarVencidos(almacen));
+
+  app.get<{ Params: { id: string } }>("/api/equipos/:id/historial", async (request, reply) => {
+    try {
+      return await obtenerHistorial(almacen, request.params.id);
+    } catch (error) {
+      if (error instanceof ErrorPrestamos) return reply.code(error.codigo).send({ error: error.message });
+      throw error;
+    }
+  });
 
   app.post<{ Params: { id: string }; Body: Solicitud | null }>("/api/equipos/:id/solicitud", async (request, reply) => {
     const persona = request.persona;
