@@ -6,6 +6,7 @@ import type { components } from "./api.gen.js";
 
 export type Equipo = components["schemas"]["Equipo"];
 export type Vencido = components["schemas"]["Vencido"];
+export type EntradaHistorial = components["schemas"]["EntradaHistorial"];
 type Estado = components["schemas"]["Estado"];
 
 /** Colección con un documento por equipo, con id el del equipo. */
@@ -90,6 +91,16 @@ export async function listarVencidos(almacen: Almacen, hoy: string = hoyEnMadrid
     vencidos.push({ id: equipo.id, nombre: equipo.nombre, persona: equipo.persona, devolucion: equipo.devolucion });
   }
   return vencidos.sort((a, b) => a.devolucion.localeCompare(b.devolucion) || a.nombre.localeCompare(b.nombre));
+}
+
+/** Historial de un equipo: sus préstamos del más reciente al más antiguo, según el momento en que se crearon. */
+export async function obtenerHistorial(almacen: Almacen, id: string): Promise<EntradaHistorial[]> {
+  const equipo = await obtenerEquipo(almacen, id);
+  if (!equipo) throw new ErrorPrestamos(404, "No existe el equipo");
+  const prestamos = (await almacen.listar<Prestamo>(COLECCION_PRESTAMOS)).filter((p) => p.equipoId === id);
+  return prestamos
+    .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn))
+    .map((p) => ({ persona: p.persona, devolucion: p.devolucion, estado: p.estado }));
 }
 
 /**

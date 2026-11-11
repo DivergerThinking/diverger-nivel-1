@@ -14,13 +14,8 @@ async function servidor(email: string | null): Promise<FastifyInstance> {
     request.persona = email ? { email, nombre: email } : null;
     return Promise.resolve();
   });
-  // Fastify no ejecuta los hooks de un plugin en rutas que no existen (404). Las rutas de IT las añaden otras
-  // tareas (la entrega, el préstamo y la devolución ya son reales), así que aquí se montan unas de prueba en el mismo contexto
-  // para las que faltan, para comprobar que el hook las protege.
-  await app.register(async (contexto) => {
-    await rutas(contexto, { almacen: almacenEnMemoria() });
-    contexto.get("/api/equipos/:id/historial", () => []);
-  });
+  // Todas las rutas de IT del contrato ya existen, así que el hook las protege sin rutas de prueba.
+  await app.register(rutas, { almacen: almacenEnMemoria() });
   return app;
 }
 
