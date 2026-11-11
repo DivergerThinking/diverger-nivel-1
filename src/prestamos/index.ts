@@ -4,6 +4,7 @@ import type { FastifyPluginAsync } from "fastify";
 import "../../lib/auth.js";
 import type { OpcionesContexto } from "../../lib/datos.js";
 import type { components } from "./api.gen.js";
+import { esCuentaDeIT, esOperacionDeIT, MENSAJE_SOLO_IT } from "./it.js";
 import { ErrorPrestamos, listarEquiposConEstado, solicitarEquipo } from "./prestamos.js";
 
 type Solicitud = components["schemas"]["Solicitud"];
@@ -14,6 +15,15 @@ type Solicitud = components["schemas"]["Solicitud"];
  * correo del token.
  */
 export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) => {
+  // Las operaciones de IT son solo de las cuentas de CORREOS_IT: se comprueba antes de leer o escribir nada.
+  app.addHook("onRequest", (request, reply) => {
+    if (!esOperacionDeIT(request.method, request.url)) return Promise.resolve();
+    const persona = request.persona;
+    if (!persona) return reply.code(401).send({ error: "Inicia sesión con Google." });
+    if (!esCuentaDeIT(persona.email)) return reply.code(403).send({ error: MENSAJE_SOLO_IT });
+    return Promise.resolve();
+  });
+
   app.get("/api/equipos", () => listarEquiposConEstado(almacen));
 
   app.post<{ Params: { id: string }; Body: Solicitud | null }>("/api/equipos/:id/solicitud", async (request, reply) => {
