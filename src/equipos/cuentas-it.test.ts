@@ -59,7 +59,7 @@ describe("POST /api/equipos solo para IT", () => {
   it("no rechaza a una cuenta de IT, aunque el correo cambie de mayúsculas", async () => {
     const app = await servidor("inventario@empresa.com", "it@empresa.com,Inventario@empresa.com");
     const respuesta = await app.inject(peticion);
-    expect(respuesta.statusCode).toBe(501);
+    expect(respuesta.statusCode).toBe(201);
     delete process.env["CORREOS_IT"];
   });
 
