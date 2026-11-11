@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "HU-ACC-02-equipos",
   "title": "Equipos: reservar las operaciones de IT a las cuentas de IT (HU-ACC-02)",
-  "status": "pending",
+  "status": "done",
   "story": "HU-ACC-02",
   "context": "equipos",
   "modules": ["src/equipos"],
