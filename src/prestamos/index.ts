@@ -5,9 +5,10 @@ import "../../lib/auth.js";
 import type { OpcionesContexto } from "../../lib/datos.js";
 import type { components } from "./api.gen.js";
 import { esCuentaDeIT, esOperacionDeIT, MENSAJE_SOLO_IT } from "./it.js";
-import { entregarEquipo, ErrorPrestamos, listarEquiposConEstado, solicitarEquipo } from "./prestamos.js";
+import { entregarEquipo, ErrorPrestamos, listarEquiposConEstado, prestarEquipo, solicitarEquipo } from "./prestamos.js";
 
 type Solicitud = components["schemas"]["Solicitud"];
+type PrestamoMostrador = components["schemas"]["PrestamoMostrador"];
 
 /**
  * Rutas del contrato spec/contextos/prestamos/api.openapi.json. El inicio de sesión con Google (401 «Inicia
@@ -41,6 +42,16 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
   app.post<{ Params: { id: string } }>("/api/equipos/:id/entrega", async (request, reply) => {
     try {
       return await entregarEquipo(almacen, request.params.id);
+    } catch (error) {
+      if (error instanceof ErrorPrestamos) return reply.code(error.codigo).send({ error: error.message });
+      throw error;
+    }
+  });
+
+  app.post<{ Params: { id: string }; Body: PrestamoMostrador | null }>("/api/equipos/:id/prestamo", async (request, reply) => {
+    try {
+      const equipo = await prestarEquipo(almacen, request.params.id, request.body?.persona, request.body?.devolucion);
+      return await reply.code(201).send(equipo);
     } catch (error) {
       if (error instanceof ErrorPrestamos) return reply.code(error.codigo).send({ error: error.message });
       throw error;

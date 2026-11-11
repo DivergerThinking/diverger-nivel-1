@@ -112,6 +112,42 @@ export async function solicitarEquipo(
 }
 
 /**
+ * Préstamo en el mostrador: deja el equipo prestado a nombre de la persona con su fecha de devolución, sin pasar
+ * por una solicitud. Una fecha pasada se admite: el préstamo aparece entre los vencidos. Solo se presta un equipo
+ * disponible; el estado se lee y se escribe en una transacción.
+ */
+export async function prestarEquipo(
+  almacen: Almacen,
+  id: string,
+  persona: string | undefined,
+  devolucion: string | undefined,
+): Promise<Equipo> {
+  const equipo = await obtenerEquipo(almacen, id);
+  if (!equipo) throw new ErrorPrestamos(404, "No existe el equipo");
+  if (persona === undefined || persona.trim() === "" || devolucion === undefined || devolucion === "") {
+    throw new ErrorPrestamos(400, "Faltan la persona o la fecha de devolución");
+  }
+  if (!esFechaValida(devolucion)) throw new ErrorPrestamos(400, "La fecha de devolución no es válida");
+
+  return almacen.transaccion(async (tx) => {
+    const actual = await tx.obtener<EstadoGuardado>(COLECCION_ESTADOS, id);
+    if (actual && actual.estado !== "disponible") throw new ErrorPrestamos(409, "El equipo no está disponible");
+    const prestamo: Prestamo = {
+      id: randomUUID(),
+      equipoId: id,
+      persona,
+      devolucion,
+      estado: "prestado",
+      creadoEn: new Date().toISOString(),
+    };
+    const nuevo: EstadoGuardado = { estado: "prestado", persona, devolucion, prestamoId: prestamo.id };
+    tx.guardar(COLECCION_ESTADOS, id, nuevo);
+    tx.guardar(COLECCION_PRESTAMOS, prestamo.id, prestamo);
+    return equipoConEstado(id, equipo.nombre, nuevo);
+  });
+}
+
+/**
  * Entrega de un equipo reservado: lo deja prestado con la misma persona y fecha de devolución, y su préstamo
  * pasa a prestado. Solo se entrega un equipo reservado; el estado se lee y se escribe en una transacción.
  */
