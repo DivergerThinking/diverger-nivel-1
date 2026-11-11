@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "HU-GES-02-prestamos",
   "title": "Préstamos: entregar un equipo reservado (HU-GES-02)",
-  "status": "pending",
+  "status": "done",
   "story": "HU-GES-02",
   "context": "prestamos",
   "modules": ["src/prestamos"],

@@ -5,7 +5,7 @@ import "../../lib/auth.js";
 import type { OpcionesContexto } from "../../lib/datos.js";
 import type { components } from "./api.gen.js";
 import { esCuentaDeIT, esOperacionDeIT, MENSAJE_SOLO_IT } from "./it.js";
-import { ErrorPrestamos, listarEquiposConEstado, solicitarEquipo } from "./prestamos.js";
+import { entregarEquipo, ErrorPrestamos, listarEquiposConEstado, solicitarEquipo } from "./prestamos.js";
 
 type Solicitud = components["schemas"]["Solicitud"];
 
@@ -32,6 +32,15 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     try {
       const equipo = await solicitarEquipo(almacen, request.params.id, persona.email, request.body?.devolucion);
       return await reply.code(201).send(equipo);
+    } catch (error) {
+      if (error instanceof ErrorPrestamos) return reply.code(error.codigo).send({ error: error.message });
+      throw error;
+    }
+  });
+
+  app.post<{ Params: { id: string } }>("/api/equipos/:id/entrega", async (request, reply) => {
+    try {
+      return await entregarEquipo(almacen, request.params.id);
     } catch (error) {
       if (error instanceof ErrorPrestamos) return reply.code(error.codigo).send({ error: error.message });
       throw error;
