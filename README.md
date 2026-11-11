@@ -6,3 +6,5 @@ Repo de evaluación del nivel 1 del harness Diverger ExP. La aplicación la gene
 - Lo prepara `infra/github/repo-nivel.sh` del harness, y la preparación de los entornos está en `infra/entornos/LEEME.md` de [Diverger-ExP-Harness](https://github.com/DivergerThinking/Diverger-ExP-Harness).
 
 Es público a propósito: con el plan Free de GitHub, las protecciones de rama solo funcionan en repositorios públicos ([ADR 0001](https://github.com/DivergerThinking/Diverger-ExP-Harness/blob/main/docs/adr/0001-repos-de-prueba-publicos.md)). No contiene datos ni credenciales.
+
+<!-- TA-169 (harness#327): PR de prueba, no se integra. -->
