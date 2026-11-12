@@ -23,7 +23,8 @@ proteccion_borrado = false
 google_client_id = "856958240211-9odcnq6f4roe1er15rijo624ht8ekjmd.apps.googleusercontent.com"
 
 # Las cuentas de IT del nivel 1 (petición del nivel 1 del harness, EN-GP-07): la cuenta con la que entran
-# el validador y el inventario. Solo correos que pueden ser públicos: este repositorio lo es.
+# el validador y el inventario, y la de la demo (harness#442). Solo correos que pueden ser públicos: este
+# repositorio lo es.
 variables_entorno = {
-  CORREOS_IT = "diverger-validacion@diverger-exp-harness.iam.gserviceaccount.com"
+  CORREOS_IT = "diverger-validacion@diverger-exp-harness.iam.gserviceaccount.com,demo-it@diverger.ai"
 }
