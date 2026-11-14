@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { almacenEnMemoria, type Almacen } from "../../lib/datos.js";
 import { darDeAlta } from "../equipos/equipos.js";
 import { rutas } from "./index.js";
-import { COLECCION_ACTIVOS, COLECCION_PRESTAMOS, esFechaReal, hoyEnMadrid, listarEquiposConEstado, solicitarEquipo, type Prestamo } from "./prestamos.js";
+import { COLECCION_ACTIVOS, COLECCION_PRESTAMOS, entregarEquipo, esFechaReal, hoyEnMadrid, listarEquiposConEstado, solicitarEquipo, type Prestamo } from "./prestamos.js";
 
 async function servidor(almacen: Almacen) {
   const app = Fastify();
@@ -82,6 +82,84 @@ describe("GET /api/equipos/:id/historial", () => {
     const respuesta = await app.inject(`/api/equipos/${id}/historial`);
     expect(respuesta.statusCode).toBe(403);
     expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+  });
+});
+
+describe("POST /api/equipos/:id/entrega", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const entregar = async (almacen: Almacen, id: string) => {
+    const app = await servidor(almacen);
+    return app.inject({ method: "POST", url: `/api/equipos/${id}/entrega` });
+  };
+
+  it("responde 200 con el equipo prestado a quien lo pidió, con su devolución, y lo deja prestado", async () => {
+    vi.stubEnv("CORREOS_IT", "ana.perez@empresa.com");
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Portátil 07");
+    await prestar(almacen, id, "reservado", "luis.gomez@empresa.com", "2026-11-20");
+    const respuesta = await entregar(almacen, id);
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual({ id, nombre: "Portátil 07", estado: "prestado", persona: "luis.gomez@empresa.com", devolucion: "2026-11-20" });
+    expect(await listarEquiposConEstado(almacen)).toEqual([
+      { id, nombre: "Portátil 07", estado: "prestado", persona: "luis.gomez@empresa.com", devolucion: "2026-11-20" },
+    ]);
+  });
+
+  it("responde 409 «El equipo no está reservado» si está disponible y sigue disponible", async () => {
+    vi.stubEnv("CORREOS_IT", "ana.perez@empresa.com");
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Monitor 03");
+    const respuesta = await entregar(almacen, id);
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está reservado" });
+    expect(await listarEquiposConEstado(almacen)).toEqual([{ id, nombre: "Monitor 03", estado: "disponible" }]);
+  });
+
+  it("responde 409 si el equipo ya está prestado o su préstamo está devuelto", async () => {
+    vi.stubEnv("CORREOS_IT", "ana.perez@empresa.com");
+    const almacen = almacenEnMemoria();
+    const prestado = await equipoNuevo(almacen, "Proyector 02");
+    const devuelto = await equipoNuevo(almacen, "Monitor 03");
+    await prestar(almacen, prestado, "prestado", "luis.gomez@empresa.com", "2026-11-20");
+    await prestar(almacen, devuelto, "devuelto", "luis.gomez@empresa.com", "2026-11-20");
+    await almacen.guardar(COLECCION_ACTIVOS, devuelto, { prestamoId: `p-${devuelto}` });
+    for (const id of [prestado, devuelto]) {
+      const respuesta = await entregar(almacen, id);
+      expect(respuesta.statusCode).toBe(409);
+      expect(respuesta.json()).toEqual({ error: "El equipo no está reservado" });
+    }
+  });
+
+  it("responde 403 «Solo IT puede hacer esto.» a una cuenta que no es de IT y sigue reservado", async () => {
+    vi.stubEnv("CORREOS_IT", "it@empresa.com,soporte@empresa.com");
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Portátil 07");
+    await prestar(almacen, id, "reservado", "ana.perez@empresa.com", "2026-11-20");
+    const respuesta = await entregar(almacen, id);
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+    expect(await listarEquiposConEstado(almacen)).toEqual([
+      { id, nombre: "Portátil 07", estado: "reservado", persona: "ana.perez@empresa.com", devolucion: "2026-11-20" },
+    ]);
+  });
+
+  it("responde 404 «No existe el equipo» si el equipo no existe", async () => {
+    vi.stubEnv("CORREOS_IT", "ana.perez@empresa.com");
+    const respuesta = await entregar(almacenEnMemoria(), "equipo-inexistente");
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("con dos entregas a la vez, una sale bien y la otra recibe 409", async () => {
+    vi.stubEnv("CORREOS_IT", "ana.perez@empresa.com");
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Portátil 07");
+    await prestar(almacen, id, "reservado", "luis.gomez@empresa.com", "2026-11-20");
+    const resultados = await Promise.all([entregarEquipo(almacen, id), entregarEquipo(almacen, id)]);
+    expect(resultados.map((r) => r.tipo).sort()).toEqual(["noReservado", "prestado"]);
   });
 });
 
