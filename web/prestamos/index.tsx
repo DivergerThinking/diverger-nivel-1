@@ -1,5 +1,14 @@
 // Pantallas del contexto «prestamos»: las que describe spec/contextos/prestamos/pantallas.md.
-import type { Pantalla } from "../pantallas.js";
+import { siPuedeLlamar, type Pantalla } from "../pantallas.js";
 import { Equipos } from "./Equipos.js";
+import { Historial } from "./Historial.js";
 
-export const pantallas: Pantalla[] = [{ id: "prestamos-equipos", titulo: "Equipos", Componente: Equipos }];
+export const pantallas: Pantalla[] = [
+  { id: "prestamos-equipos", titulo: "Equipos", Componente: Equipos },
+  {
+    id: "prestamos-historial",
+    titulo: "Historial de un equipo",
+    Componente: Historial,
+    visible: siPuedeLlamar("/api/prestamos/vencidos"),
+  },
+];
