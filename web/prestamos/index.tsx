@@ -2,9 +2,16 @@
 import { siPuedeLlamar, type Pantalla } from "../pantallas.js";
 import { Equipos } from "./Equipos.js";
 import { Historial } from "./Historial.js";
+import { Mostrador } from "./Mostrador.js";
 
 export const pantallas: Pantalla[] = [
   { id: "prestamos-equipos", titulo: "Equipos", Componente: Equipos },
+  {
+    id: "prestamos-mostrador",
+    titulo: "Mostrador de IT",
+    Componente: Mostrador,
+    visible: siPuedeLlamar("/api/prestamos/vencidos"),
+  },
   {
     id: "prestamos-historial",
     titulo: "Historial de un equipo",

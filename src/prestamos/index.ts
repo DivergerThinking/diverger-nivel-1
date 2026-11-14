@@ -6,12 +6,14 @@ import { soloIT } from "../equipos/index.js";
 import type { components } from "./api.gen.js";
 import {
   consultarHistorial,
+  entregarEquipo,
   FALTA_FECHA,
   FECHA_NO_VALIDA,
   FECHA_PASADA,
   listarEquiposConEstado,
   NO_DISPONIBLE,
   NO_EXISTE_EQUIPO,
+  NO_RESERVADO,
   solicitarEquipo,
 } from "./prestamos.js";
 
@@ -49,6 +51,15 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     const [codigo, mensaje] = fallos[resultado.tipo];
     const cuerpo: Error = { error: mensaje };
     return reply.code(codigo).send(cuerpo);
+  });
+  app.post<{ Params: { id: string } }>("/api/equipos/:id/entrega", { preHandler: soloIT }, async (request, reply) => {
+    const resultado = await entregarEquipo(almacen, request.params.id);
+    if (resultado.tipo === "prestado") {
+      const equipo: Equipo = resultado.equipo;
+      return reply.code(200).send(equipo);
+    }
+    const cuerpo: Error = { error: resultado.tipo === "noExiste" ? NO_EXISTE_EQUIPO : NO_RESERVADO };
+    return reply.code(resultado.tipo === "noExiste" ? 404 : 409).send(cuerpo);
   });
   app.get<{ Params: { id: string } }>("/api/equipos/:id/historial", { preHandler: soloIT }, async (request, reply) => {
     const historial: EntradaDelContrato[] | undefined = await consultarHistorial(almacen, request.params.id);
