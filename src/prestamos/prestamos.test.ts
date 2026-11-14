@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { almacenEnMemoria, type Almacen } from "../../lib/datos.js";
 import { darDeAlta } from "../equipos/equipos.js";
 import { rutas } from "./index.js";
-import { COLECCION_ACTIVOS, COLECCION_PRESTAMOS, esFechaReal, hoyEnMadrid, listarEquiposConEstado, type Prestamo } from "./prestamos.js";
+import { COLECCION_ACTIVOS, COLECCION_PRESTAMOS, esFechaReal, hoyEnMadrid, listarEquiposConEstado, solicitarEquipo, type Prestamo } from "./prestamos.js";
 
 async function servidor(almacen: Almacen) {
   const app = Fastify();
@@ -188,6 +188,42 @@ describe("POST /api/equipos/:id/solicitud", () => {
     const respuesta = await pedir(almacen, id, { devolucion: "2000-01-01" });
     expect(respuesta.statusCode).toBe(400);
     expect(respuesta.json()).toEqual({ error: "La fecha de devolución ya ha pasado" });
+    expect(await listarEquiposConEstado(almacen)).toEqual([{ id, nombre: "Portátil 07", estado: "disponible" }]);
+  });
+});
+
+describe("solicitarEquipo con la fecha de hoy en Madrid", () => {
+  const ahora = new Date("2026-11-14T10:00:00Z");
+
+  it("acepta la devolución de hoy (14 de noviembre de 2026) y reserva el equipo", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Portátil 07");
+    const resultado = await solicitarEquipo(almacen, id, "ana.perez@empresa.com", "2026-11-14", ahora);
+    expect(resultado).toEqual({
+      tipo: "reservado",
+      equipo: { id, nombre: "Portátil 07", estado: "reservado", persona: "ana.perez@empresa.com", devolucion: "2026-11-14" },
+    });
+  });
+
+  it("rechaza la devolución de ayer y el equipo sigue disponible", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Portátil 07");
+    expect(await solicitarEquipo(almacen, id, "ana.perez@empresa.com", "2026-11-13", ahora)).toEqual({ tipo: "fechaPasada" });
+    expect(await listarEquiposConEstado(almacen)).toEqual([{ id, nombre: "Portátil 07", estado: "disponible" }]);
+  });
+
+  it("cuenta el día de Madrid: a las 23:30 UTC ya es el día siguiente", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Portátil 07");
+    const tarde = new Date("2026-11-14T23:30:00Z");
+    expect(await solicitarEquipo(almacen, id, "ana.perez@empresa.com", "2026-11-14", tarde)).toEqual({ tipo: "fechaPasada" });
+  });
+
+  it("rechaza una fecha inexistente o ausente y el equipo sigue disponible", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Portátil 07");
+    expect(await solicitarEquipo(almacen, id, "ana.perez@empresa.com", "2026-02-30", ahora)).toEqual({ tipo: "fechaNoValida" });
+    expect(await solicitarEquipo(almacen, id, "ana.perez@empresa.com", undefined, ahora)).toEqual({ tipo: "sinFecha" });
     expect(await listarEquiposConEstado(almacen)).toEqual([{ id, nombre: "Portátil 07", estado: "disponible" }]);
   });
 });

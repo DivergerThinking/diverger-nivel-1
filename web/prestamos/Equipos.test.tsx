@@ -84,6 +84,35 @@ describe("pantalla Equipos", () => {
     expect((await screen.findByRole("alert")).textContent).toBe("El equipo no está disponible");
   });
 
+  it.each([
+    ["2026-11-13", "La fecha de devolución ya ha pasado"],
+    ["2026-02-30", "La fecha de devolución no es válida"],
+    ["", "Falta la fecha de devolución"],
+  ])("si la fecha de devolución «%s» no sirve, enseña el mensaje de la API tal cual", async (fecha, error) => {
+    const fetch = vi.fn((_ruta: string, opciones: { method: string }) =>
+      Promise.resolve(
+        opciones.method === "POST"
+          ? respuesta({ error }, 400)
+          : respuesta([{ id: "e1", nombre: "Portátil 07", estado: "disponible" }]),
+      ),
+    );
+    vi.stubGlobal("fetch", fetch);
+    render(<Equipos sesion={SESION} />);
+    await screen.findByText("Portátil 07: disponible");
+    fireEvent.change(screen.getByLabelText("Equipo a pedir"), { target: { value: "e1" } });
+    fireEvent.change(screen.getByLabelText("Fecha de devolución"), { target: { value: fecha } });
+    // El campo de fecha del navegador descarta lo que no es una fecha real, así que se envía lo que contiene.
+    const enviada = screen.getByLabelText<HTMLInputElement>("Fecha de devolución").value;
+    fireEvent.click(screen.getByRole("button", { name: "Pedir equipo" }));
+    expect((await screen.findByRole("alert")).textContent).toBe(error);
+    expect(fetch).toHaveBeenCalledWith("/api/equipos/e1/solicitud", {
+      method: "POST",
+      headers: { authorization: "Bearer token-de-ana", "content-type": "application/json" },
+      body: JSON.stringify({ devolucion: enviada }),
+    });
+    expect(screen.getByText("Portátil 07: disponible")).toBeTruthy();
+  });
+
   it("con 401 enseña el mensaje de la API tal cual", async () => {
     vi.stubGlobal("fetch", () => Promise.resolve(respuesta({ error: "Inicia sesión con Google." }, 401)));
     render(<Equipos sesion={SESION} />);
