@@ -1,0 +1,104 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Equipos",
+    "version": "1.0.0",
+    "description": "Alta de los equipos de la oficina. La ruta, los campos, los códigos y los errores son los de la API fijada por el cliente (ADR 0001)."
+  },
+  "servers": [{ "url": "/" }],
+  "security": [{ "google": [] }],
+  "paths": {
+    "/api/equipos": {
+      "post": {
+        "operationId": "equipos.darDeAltaEquipo",
+        "summary": "Dar de alta un equipo (solo IT)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AltaEquipo" },
+              "example": { "nombre": "Portátil 07" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Equipo dado de alta, disponible",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EquipoNuevo" },
+                "example": { "id": "…", "nombre": "Portátil 07", "estado": "disponible" }
+              }
+            }
+          },
+          "400": {
+            "description": "Falta el nombre del equipo, o está vacío",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "Falta el nombre del equipo" }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin un token válido",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "Inicia sesión con Google." }
+              }
+            }
+          },
+          "403": {
+            "description": "La cuenta no es de IT",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "Solo IT puede hacer esto." }
+              }
+            }
+          },
+          "409": {
+            "description": "Ya hay un equipo con ese nombre, sin distinguir mayúsculas ni espacios al principio o al final",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "Ya hay un equipo con ese nombre" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "google": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Token de identidad de Google, con el correo verificado y emitido para el cliente OAuth de la aplicación, de una persona o de una cuenta de servicio"
+      }
+    },
+    "schemas": {
+      "AltaEquipo": {
+        "type": "object",
+        "properties": { "nombre": { "type": "string" } }
+      },
+      "EquipoNuevo": {
+        "type": "object",
+        "required": ["id", "nombre", "estado"],
+        "properties": {
+          "id": { "type": "string" },
+          "nombre": { "type": "string" },
+          "estado": { "type": "string", "const": "disponible" }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": { "error": { "type": "string" } }
+      }
+    }
+  }
+}
