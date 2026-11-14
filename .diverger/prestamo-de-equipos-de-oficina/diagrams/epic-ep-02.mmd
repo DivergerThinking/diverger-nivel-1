@@ -1,0 +1,21 @@
+flowchart LR
+    EP_02["EP-02 · Inventario de equipos"]
+    HU_EQU_01["HU-EQU-01 · Dar de alta un equipo · publicada"]
+    EP_02 --> HU_EQU_01
+    HU_EQU_02["HU-EQU-02 · Ver los equipos y su estado · publicada"]
+    EP_02 --> HU_EQU_02
+    HU_EQU_03["HU-EQU-03 · Consultar el historial de un equipo · publicada"]
+    EP_02 --> HU_EQU_03
+    HU_ACC_01["HU-ACC-01 · Entrar con la cuenta de Google de la empresa · publicada"]
+    EN_ACC_01["EN-ACC-01 · Limitar a IT las operaciones de IT · publicada"]
+    HU_ACC_01 -.->|bloquea| HU_EQU_01
+    EN_ACC_01 -.->|bloquea| HU_EQU_01
+    HU_EQU_01 -.->|bloquea| HU_EQU_02
+    HU_EQU_01 -.->|bloquea| HU_EQU_03
+    EN_ACC_01 -.->|bloquea| HU_EQU_03
+    classDef epic fill:#ede7f6,stroke:#5e35b1,color:#311b92
+    classDef published fill:#e8f5e9,stroke:#43a047,color:#1b5e20
+    classDef external fill:#ffffff,stroke:#9e9e9e,color:#616161,stroke-dasharray:2 2
+    class EP_02 epic
+    class HU_EQU_01,HU_EQU_02,HU_EQU_03 published
+    class HU_ACC_01,EN_ACC_01 external

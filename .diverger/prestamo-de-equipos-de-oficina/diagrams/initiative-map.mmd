@@ -1,0 +1,38 @@
+flowchart LR
+    INI["Préstamo de equipos de oficina"]
+    EP_01["EP-01 · Acceso y permisos"]
+    INI --> EP_01
+    EP_02["EP-02 · Inventario de equipos"]
+    INI --> EP_02
+    EP_03["EP-03 · Solicitudes de equipos"]
+    INI --> EP_03
+    EP_04["EP-04 · Préstamos y devoluciones"]
+    INI --> EP_04
+    HU_ACC_01["HU-ACC-01 · Entrar con la cuenta de Google de la empresa · publicada"]
+    EP_01 --> HU_ACC_01
+    EN_ACC_01["EN-ACC-01 · Limitar a IT las operaciones de IT · publicada"]
+    EP_01 --> EN_ACC_01
+    HU_EQU_01["HU-EQU-01 · Dar de alta un equipo · publicada"]
+    EP_02 --> HU_EQU_01
+    HU_EQU_02["HU-EQU-02 · Ver los equipos y su estado · publicada"]
+    EP_02 --> HU_EQU_02
+    HU_EQU_03["HU-EQU-03 · Consultar el historial de un equipo · publicada"]
+    EP_02 --> HU_EQU_03
+    HU_SOL_01["HU-SOL-01 · Pedir un equipo disponible · publicada"]
+    EP_03 --> HU_SOL_01
+    HU_SOL_03["HU-SOL-03 · Validar la fecha de devolución de una solicitud · publicada"]
+    EP_03 --> HU_SOL_03
+    HU_SOL_02["HU-SOL-02 · Evitar reservas y préstamos dobles simultáneos · publicada"]
+    EP_03 --> HU_SOL_02
+    HU_PRE_01["HU-PRE-01 · Entregar un equipo reservado · publicada"]
+    EP_04 --> HU_PRE_01
+    HU_PRE_02["HU-PRE-02 · Prestar un equipo en el mostrador · publicada"]
+    EP_04 --> HU_PRE_02
+    HU_PRE_03["HU-PRE-03 · Apuntar la devolución de un equipo · publicada"]
+    EP_04 --> HU_PRE_03
+    HU_PRE_04["HU-PRE-04 · Ver los préstamos vencidos · publicada"]
+    EP_04 --> HU_PRE_04
+    classDef epic fill:#ede7f6,stroke:#5e35b1,color:#311b92
+    classDef published fill:#e8f5e9,stroke:#43a047,color:#1b5e20
+    class EP_01,EP_02,EP_03,EP_04 epic
+    class HU_ACC_01,EN_ACC_01,HU_EQU_01,HU_EQU_02,HU_EQU_03,HU_SOL_01,HU_SOL_03,HU_SOL_02,HU_PRE_01,HU_PRE_02,HU_PRE_03,HU_PRE_04 published
