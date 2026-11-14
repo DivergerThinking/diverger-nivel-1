@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { almacenEnMemoria, type Almacen } from "../../lib/datos.js";
 import { darDeAlta } from "../equipos/equipos.js";
 import { rutas } from "./index.js";
-import { COLECCION_ACTIVOS, COLECCION_PRESTAMOS, listarEquiposConEstado, type Prestamo } from "./prestamos.js";
+import { COLECCION_ACTIVOS, COLECCION_PRESTAMOS, esFechaReal, hoyEnMadrid, listarEquiposConEstado, type Prestamo } from "./prestamos.js";
 
 async function servidor(almacen: Almacen) {
   const app = Fastify();
@@ -82,6 +82,126 @@ describe("GET /api/equipos/:id/historial", () => {
     const respuesta = await app.inject(`/api/equipos/${id}/historial`);
     expect(respuesta.statusCode).toBe(403);
     expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+  });
+});
+
+describe("POST /api/equipos/:id/solicitud", () => {
+  const pedir = async (almacen: Almacen, id: string, cuerpo: unknown) => {
+    const app = await servidor(almacen);
+    return app.inject({ method: "POST", url: `/api/equipos/${id}/solicitud`, payload: cuerpo as object });
+  };
+
+  it("responde 201 con el equipo reservado a nombre de la persona del token y lo deja reservado", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Portátil 07");
+    const respuesta = await pedir(almacen, id, { devolucion: "2999-11-20" });
+    expect(respuesta.statusCode).toBe(201);
+    expect(respuesta.json()).toEqual({
+      id,
+      nombre: "Portátil 07",
+      estado: "reservado",
+      persona: "ana.perez@empresa.com",
+      devolucion: "2999-11-20",
+    });
+    expect(await listarEquiposConEstado(almacen)).toEqual([
+      { id, nombre: "Portátil 07", estado: "reservado", persona: "ana.perez@empresa.com", devolucion: "2999-11-20" },
+    ]);
+  });
+
+  it("acepta la fecha de hoy", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Portátil 07");
+    const respuesta = await pedir(almacen, id, { devolucion: hoyEnMadrid() });
+    expect(respuesta.statusCode).toBe(201);
+  });
+
+  it("responde 409 «El equipo no está disponible» si está prestado y no lo cambia", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Proyector 02");
+    await prestar(almacen, id, "prestado", "luis.gomez@empresa.com", "2999-11-25");
+    const respuesta = await pedir(almacen, id, { devolucion: "2999-11-20" });
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está disponible" });
+    expect(await listarEquiposConEstado(almacen)).toEqual([
+      { id, nombre: "Proyector 02", estado: "prestado", persona: "luis.gomez@empresa.com", devolucion: "2999-11-25" },
+    ]);
+  });
+
+  it("responde 409 si el equipo ya está reservado", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Proyector 02");
+    await prestar(almacen, id, "reservado", "luis.gomez@empresa.com", "2999-11-25");
+    const respuesta = await pedir(almacen, id, { devolucion: "2999-11-20" });
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está disponible" });
+  });
+
+  it("con dos solicitudes a la vez, una sale bien y la otra recibe 409", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Portátil 07");
+    const respuestas = await Promise.all([pedir(almacen, id, { devolucion: "2999-11-20" }), pedir(almacen, id, { devolucion: "2999-11-21" })]);
+    expect(respuestas.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+  });
+
+  it("un equipo devuelto se puede volver a pedir", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Portátil 07");
+    await prestar(almacen, id, "devuelto", "luis.gomez@empresa.com", "2999-11-25");
+    await almacen.guardar(COLECCION_ACTIVOS, id, { prestamoId: `p-${id}` });
+    const respuesta = await pedir(almacen, id, { devolucion: "2999-11-20" });
+    expect(respuesta.statusCode).toBe(201);
+  });
+
+  it("responde 404 «No existe el equipo» si el equipo no existe", async () => {
+    const respuesta = await pedir(almacenEnMemoria(), "equipo-inexistente", { devolucion: "2999-11-20" });
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("responde 400 «Falta la fecha de devolución» sin fecha o sin cuerpo", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Portátil 07");
+    for (const cuerpo of [{}, { devolucion: "" }, { devolucion: 20 }]) {
+      const respuesta = await pedir(almacen, id, cuerpo);
+      expect(respuesta.statusCode).toBe(400);
+      expect(respuesta.json()).toEqual({ error: "Falta la fecha de devolución" });
+    }
+    const app = await servidor(almacen);
+    const sinCuerpo = await app.inject({ method: "POST", url: `/api/equipos/${id}/solicitud` });
+    expect(sinCuerpo.statusCode).toBe(400);
+    expect(sinCuerpo.json()).toEqual({ error: "Falta la fecha de devolución" });
+  });
+
+  it("responde 400 «La fecha de devolución no es válida» si no es una fecha real", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Portátil 07");
+    for (const devolucion of ["2999-02-30", "mañana", "20-11-2999", "2999-13-01"]) {
+      const respuesta = await pedir(almacen, id, { devolucion });
+      expect(respuesta.statusCode).toBe(400);
+      expect(respuesta.json()).toEqual({ error: "La fecha de devolución no es válida" });
+    }
+  });
+
+  it("responde 400 «La fecha de devolución ya ha pasado» si es anterior a hoy y no reserva", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Portátil 07");
+    const respuesta = await pedir(almacen, id, { devolucion: "2000-01-01" });
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: "La fecha de devolución ya ha pasado" });
+    expect(await listarEquiposConEstado(almacen)).toEqual([{ id, nombre: "Portátil 07", estado: "disponible" }]);
+  });
+});
+
+describe("hoyEnMadrid y esFechaReal", () => {
+  it("usa el día de Madrid, no el UTC", () => {
+    expect(hoyEnMadrid(new Date("2026-11-14T23:30:00Z"))).toBe("2026-11-15");
+    expect(hoyEnMadrid(new Date("2026-11-14T10:00:00Z"))).toBe("2026-11-14");
+  });
+
+  it("distingue fechas reales de las que no lo son", () => {
+    expect(esFechaReal("2028-02-29")).toBe(true);
+    expect(esFechaReal("2026-02-29")).toBe(false);
+    expect(esFechaReal("2026-02-30")).toBe(false);
   });
 });
 
