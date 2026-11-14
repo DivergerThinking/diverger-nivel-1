@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "HU-EQU-03-prestamos",
   "title": "Préstamos: consultar el historial de un equipo (HU-EQU-03)",
-  "status": "pending",
+  "status": "done",
   "story": "HU-EQU-03",
   "context": "prestamos",
   "modules": ["src/prestamos", "web/prestamos"],
