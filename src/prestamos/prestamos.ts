@@ -25,6 +25,7 @@ interface DocumentoPrestamo {
 export const FALTA_FECHA = "Falta la fecha de devolución";
 export const FECHA_NO_VALIDA = "La fecha de devolución no es válida";
 export const FECHA_PASADA = "La fecha de devolución ya ha pasado";
+export const FALTAN_DATOS = "Faltan la persona o la fecha de devolución";
 export const NO_EXISTE_EQUIPO = "No existe el equipo";
 export const NO_DISPONIBLE = "El equipo no está disponible";
 export const NO_RESERVADO = "El equipo no está reservado";
@@ -86,6 +87,36 @@ export async function entregarEquipo(almacen: Almacen, id: string): Promise<Equi
     const estado: DocumentoEstado = { ...actual, estado: "prestado" };
     tx.guardar(COLECCION_ESTADOS, id, estado);
     if (prestamo) tx.guardar(COLECCION_HISTORIAL, actual.prestamoId, { ...prestamo, estado: "prestado" });
+    return aEquipo(equipo, estado);
+  });
+}
+
+/** Presta en el mostrador un equipo disponible a `persona`. Admite fechas pasadas: IT apunta préstamos con retraso. */
+export async function prestarEquipo(
+  almacen: Almacen,
+  id: string,
+  personaPedida: unknown,
+  devolucionPedida: unknown,
+): Promise<Equipo> {
+  const equipo = await obtenerEquipo(almacen, id);
+  if (!equipo) throw new ErrorDePrestamos(404, NO_EXISTE_EQUIPO);
+  const persona = typeof personaPedida === "string" ? personaPedida.trim() : "";
+  const sinFecha = devolucionPedida === undefined || devolucionPedida === null || devolucionPedida === "";
+  if (persona === "" || sinFecha) throw new ErrorDePrestamos(400, FALTAN_DATOS);
+  const devolucion = fechaDeDevolucion(devolucionPedida);
+
+  return almacen.transaccion(async (tx) => {
+    if (await tx.obtener<DocumentoEstado>(COLECCION_ESTADOS, id)) throw new ErrorDePrestamos(409, NO_DISPONIBLE);
+    const prestamoId = randomUUID();
+    const estado: DocumentoEstado = { equipoId: id, estado: "prestado", persona, devolucion, prestamoId };
+    tx.guardar(COLECCION_ESTADOS, id, estado);
+    tx.guardar(COLECCION_HISTORIAL, prestamoId, {
+      equipoId: id,
+      persona,
+      devolucion,
+      estado: "prestado",
+      inicio: new Date().toISOString(),
+    } satisfies DocumentoPrestamo);
     return aEquipo(equipo, estado);
   });
 }

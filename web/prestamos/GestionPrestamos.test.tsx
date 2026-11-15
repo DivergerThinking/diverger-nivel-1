@@ -55,6 +55,43 @@ describe("pantalla Gestión de préstamos", () => {
     expect((await screen.findByRole("alert")).textContent).toBe("El equipo no está reservado");
   });
 
+  it("presta en el mostrador un equipo disponible con la persona y la fecha, con el token de la sesión", async () => {
+    const fetch = vi.fn((_ruta: string, opciones: { method: string }) =>
+      Promise.resolve(opciones.method === "POST" ? respuesta({ ...LISTA[1], estado: "prestado" }, 201) : respuesta(LISTA)),
+    );
+    vi.stubGlobal("fetch", fetch);
+    render(<GestionPrestamos sesion={SESION} />);
+    expect(await screen.findByRole("button", { name: "Prestar Monitor 03" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Prestar Portátil 07" })).toBeNull();
+    fireEvent.change(screen.getByLabelText("Persona de Monitor 03"), { target: { value: "luis.gomez@empresa.com" } });
+    fireEvent.change(screen.getByLabelText("Devolución de Monitor 03"), { target: { value: "2026-11-20" } });
+    fireEvent.click(screen.getByRole("button", { name: "Prestar Monitor 03" }));
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith("/api/equipos/m3/prestamo", {
+        method: "POST",
+        headers: { authorization: "Bearer token-de-it", "content-type": "application/json" },
+        body: JSON.stringify({ persona: "luis.gomez@empresa.com", devolucion: "2026-11-20" }),
+      });
+    });
+    await waitFor(() => {
+      expect(fetch.mock.calls.filter(([ruta]) => ruta === "/api/equipos")).toHaveLength(2);
+    });
+  });
+
+  it.each([
+    [400, "Faltan la persona o la fecha de devolución"],
+    [400, "La fecha de devolución no es válida"],
+    [409, "El equipo no está disponible"],
+    [404, "No existe el equipo"],
+  ])("enseña el mensaje de la API tal cual si el préstamo falla con %i: %s", async (estado, mensaje) => {
+    vi.stubGlobal("fetch", (_ruta: string, opciones: { method: string }) =>
+      Promise.resolve(opciones.method === "POST" ? respuesta({ error: mensaje }, estado) : respuesta(LISTA)),
+    );
+    render(<GestionPrestamos sesion={SESION} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Prestar Monitor 03" }));
+    expect((await screen.findByRole("alert")).textContent).toBe(mensaje);
+  });
+
   it("enseña «No existe el equipo» si la API responde 404 al entregar", async () => {
     vi.stubGlobal("fetch", (_ruta: string, opciones: { method: string }) =>
       Promise.resolve(opciones.method === "POST" ? respuesta({ error: "No existe el equipo" }, 404) : respuesta(LISTA)),
