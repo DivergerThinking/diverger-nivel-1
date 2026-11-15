@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "HU-PRE-04-prestamos",
   "title": "Préstamos: ver los préstamos vencidos (HU-PRE-04)",
-  "status": "pending",
+  "status": "done",
   "story": "HU-PRE-04",
   "context": "prestamos",
   "modules": ["src/prestamos", "web/prestamos"],

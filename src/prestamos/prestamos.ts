@@ -76,6 +76,21 @@ export async function listarEquiposConEstado(almacen: Almacen): Promise<Equipo[]
   return equipos.map((equipo) => aEquipo(equipo, porEquipo.get(equipo.id)));
 }
 
+/** Equipos prestados cuya devolución es anterior a `hoy` (día actual en Madrid), del más antiguo al más reciente. */
+export async function listarVencidos(
+  almacen: Almacen,
+  hoy: string = hoyEnMadrid(),
+): Promise<components["schemas"]["PrestamoVencido"][]> {
+  const equipos = await listarEquiposConEstado(almacen);
+  const vencidos: components["schemas"]["PrestamoVencido"][] = [];
+  for (const equipo of equipos) {
+    if (equipo.estado === "prestado" && equipo.persona && equipo.devolucion && equipo.devolucion < hoy) {
+      vencidos.push({ id: equipo.id, nombre: equipo.nombre, persona: equipo.persona, devolucion: equipo.devolucion });
+    }
+  }
+  return vencidos.sort((a, b) => a.devolucion.localeCompare(b.devolucion) || a.nombre.localeCompare(b.nombre));
+}
+
 /** Entrega un equipo reservado: pasa a prestado con la misma persona y fecha de devolución. */
 export async function entregarEquipo(almacen: Almacen, id: string): Promise<Equipo> {
   const equipo = await obtenerEquipo(almacen, id);
