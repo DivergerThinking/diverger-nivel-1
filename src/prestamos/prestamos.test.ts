@@ -484,6 +484,61 @@ describe("GET /api/prestamos/vencidos (HU-PRE-04)", () => {
   });
 });
 
+describe("GET /api/equipos/{id}/historial (HU-INV-02)", () => {
+  const historial = (token: string, id: string) =>
+    app.inject({ url: `/api/equipos/${id}/historial`, headers: con(token) });
+
+  it("lista los préstamos del equipo del más reciente al más antiguo", async () => {
+    const id = await darDeAlta("Portátil 07");
+    const otro = await darDeAlta("Monitor 03");
+    await app.inject({
+      method: "POST",
+      url: `/api/equipos/${id}/prestamo`,
+      headers: con("it"),
+      payload: { persona: "luis.gomez@empresa.com", devolucion: "2026-11-10" },
+    });
+    await app.inject({
+      method: "POST",
+      url: `/api/equipos/${otro}/prestamo`,
+      headers: con("it"),
+      payload: { persona: "otra@empresa.com", devolucion: "2026-11-11" },
+    });
+    await app.inject({ method: "POST", url: `/api/equipos/${id}/devolucion`, headers: con("it") });
+    await solicitar("ana", id, { devolucion: "2026-11-20" });
+    const respuesta = await historial("it", id);
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual([
+      { persona: "ana.perez@empresa.com", devolucion: "2026-11-20", estado: "reservado" },
+      { persona: "luis.gomez@empresa.com", devolucion: "2026-11-10", estado: "devuelto" },
+    ]);
+  });
+
+  it("un equipo sin préstamos tiene el historial vacío", async () => {
+    const id = await darDeAlta("Portátil 07");
+    const respuesta = await historial("it", id);
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual([]);
+  });
+
+  it("responde 404 si el equipo no existe", async () => {
+    const respuesta = await historial("it", "no-existe");
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("responde 403 a quien no es de IT", async () => {
+    const id = await darDeAlta("Portátil 07");
+    const respuesta = await historial("ana", id);
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+  });
+
+  it("responde 401 sin sesión", async () => {
+    const respuesta = await app.inject("/api/equipos/x/historial");
+    expect(respuesta.statusCode).toBe(401);
+  });
+});
+
 describe("hoyEnMadrid", () => {
   it("da el día de Madrid, no el de UTC", () => {
     expect(hoyEnMadrid(new Date("2026-11-15T23:30:00Z"))).toBe("2026-11-16");
