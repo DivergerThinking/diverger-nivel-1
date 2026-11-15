@@ -159,6 +159,29 @@ export async function entregarEquipo(almacen: Almacen, equipoId: string): Promis
   });
 }
 
+export const NO_PRESTADO = "El equipo no está prestado";
+
+export type ResultadoDevolucion =
+  | { tipo: "devuelto"; equipo: EquipoConEstado }
+  | { tipo: "noExiste" }
+  | { tipo: "noPrestado" };
+
+/**
+ * Apunta la devolución de un equipo prestado: su préstamo pasa a devuelto y el equipo vuelve a estar disponible. Lee el
+ * préstamo activo y escribe en una sola transacción, para que dos devoluciones a la vez no se pisen.
+ */
+export async function registrarDevolucion(almacen: Almacen, equipoId: string): Promise<ResultadoDevolucion> {
+  const equipo = await obtenerEquipo(almacen, equipoId);
+  if (!equipo) return { tipo: "noExiste" };
+  return almacen.transaccion<ResultadoDevolucion>(async (tx) => {
+    const activo = await tx.obtener<Activo>(COLECCION_ACTIVOS, equipoId);
+    const vigente = activo && (await tx.obtener<Prestamo>(COLECCION_PRESTAMOS, activo.prestamoId));
+    if (!vigente || vigente.estado !== "prestado") return { tipo: "noPrestado" };
+    tx.guardar(COLECCION_PRESTAMOS, vigente.id, { ...vigente, estado: "devuelto" });
+    return { tipo: "devuelto", equipo: { id: equipo.id, nombre: equipo.nombre, estado: "disponible" } };
+  });
+}
+
 /** Los préstamos del equipo, del más reciente al más antiguo; undefined si el equipo no existe. */
 export async function consultarHistorial(almacen: Almacen, equipoId: string): Promise<EntradaHistorial[] | undefined> {
   if (!(await obtenerEquipo(almacen, equipoId))) return undefined;

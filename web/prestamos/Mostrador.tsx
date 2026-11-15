@@ -13,8 +13,8 @@ const mensaje = (motivo: unknown): string => (motivo instanceof Error ? motivo.m
 
 /**
  * Mostrador de IT: enseña la lista de equipos (GET /api/equipos), deja entregar un equipo reservado
- * (POST /api/equipos/{id}/entrega) y prestar uno disponible (POST /api/equipos/{id}/prestamo); si la API falla,
- * enseña su mensaje.
+ * (POST /api/equipos/{id}/entrega), prestar uno disponible (POST /api/equipos/{id}/prestamo) y apuntar la devolución
+ * de uno prestado (POST /api/equipos/{id}/devolucion); si la API falla, enseña su mensaje.
  */
 export function Mostrador({ sesion }: { sesion: Sesion }) {
   const [equipos, setEquipos] = useState<Equipo[] | null>(null);
@@ -64,6 +64,19 @@ export function Mostrador({ sesion }: { sesion: Sesion }) {
       });
   };
 
+  const devolver = (equipo: Equipo) => {
+    setError(null);
+    setAviso(null);
+    api<Equipo>(sesion, `/api/equipos/${encodeURIComponent(equipo.id)}/devolucion`, { metodo: "POST" })
+      .then((devuelto) => {
+        setAviso(`${devuelto.nombre} devuelto: ya está disponible`);
+        return cargar();
+      })
+      .catch((motivo: unknown) => {
+        setError(mensaje(motivo));
+      });
+  };
+
   const disponibles = equipos?.filter((equipo) => equipo.estado === "disponible") ?? [];
 
   return (
@@ -81,6 +94,11 @@ export function Mostrador({ sesion }: { sesion: Sesion }) {
               {equipo.estado === "reservado" && (
                 <button type="button" onClick={() => { entregar(equipo); }}>
                   Entregar {equipo.nombre}
+                </button>
+              )}
+              {equipo.estado === "prestado" && (
+                <button type="button" onClick={() => { devolver(equipo); }}>
+                  Apuntar devolución de {equipo.nombre}
                 </button>
               )}
             </li>

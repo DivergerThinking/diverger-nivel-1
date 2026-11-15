@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { almacenEnMemoria, type Almacen } from "../../lib/datos.js";
 import { darDeAlta } from "../equipos/equipos.js";
 import { rutas } from "./index.js";
-import { COLECCION_ACTIVOS, COLECCION_PRESTAMOS, consultarHistorial, entregarEquipo, esFechaReal, hoyEnMadrid, listarEquiposConEstado, prestarEquipo, solicitarEquipo, type Prestamo } from "./prestamos.js";
+import { COLECCION_ACTIVOS, COLECCION_PRESTAMOS, consultarHistorial, entregarEquipo, esFechaReal, hoyEnMadrid, listarEquiposConEstado, prestarEquipo, registrarDevolucion, solicitarEquipo, type Prestamo } from "./prestamos.js";
 
 async function servidor(almacen: Almacen) {
   const app = Fastify();
@@ -160,6 +160,93 @@ describe("POST /api/equipos/:id/entrega", () => {
     await prestar(almacen, id, "reservado", "luis.gomez@empresa.com", "2026-11-20");
     const resultados = await Promise.all([entregarEquipo(almacen, id), entregarEquipo(almacen, id)]);
     expect(resultados.map((r) => r.tipo).sort()).toEqual(["noReservado", "prestado"]);
+  });
+});
+
+describe("POST /api/equipos/:id/devolucion", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const devolver = async (almacen: Almacen, id: string) => {
+    const app = await servidor(almacen);
+    return app.inject({ method: "POST", url: `/api/equipos/${id}/devolucion` });
+  };
+
+  it("responde 200 con el equipo disponible, sin persona ni devolución, y lo deja disponible con el préstamo devuelto", async () => {
+    vi.stubEnv("CORREOS_IT", "ana.perez@empresa.com");
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Monitor 03");
+    await prestar(almacen, id, "prestado", "luis.gomez@empresa.com", "2026-11-20");
+    const respuesta = await devolver(almacen, id);
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual({ id, nombre: "Monitor 03", estado: "disponible" });
+    expect(await listarEquiposConEstado(almacen)).toEqual([{ id, nombre: "Monitor 03", estado: "disponible" }]);
+    expect(await consultarHistorial(almacen, id)).toEqual([{ persona: "luis.gomez@empresa.com", devolucion: "2026-11-20", estado: "devuelto" }]);
+  });
+
+  it("responde 409 «El equipo no está prestado» si está reservado y sigue reservado", async () => {
+    vi.stubEnv("CORREOS_IT", "ana.perez@empresa.com");
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Portátil 07");
+    await prestar(almacen, id, "reservado", "ana.perez@empresa.com", "2026-11-20");
+    const respuesta = await devolver(almacen, id);
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está prestado" });
+    expect(await listarEquiposConEstado(almacen)).toEqual([
+      { id, nombre: "Portátil 07", estado: "reservado", persona: "ana.perez@empresa.com", devolucion: "2026-11-20" },
+    ]);
+  });
+
+  it("responde 409 si el equipo está disponible o ya devuelto", async () => {
+    vi.stubEnv("CORREOS_IT", "ana.perez@empresa.com");
+    const almacen = almacenEnMemoria();
+    const nuevo = await equipoNuevo(almacen, "Proyector 02");
+    const devuelto = await equipoNuevo(almacen, "Monitor 03");
+    await prestar(almacen, devuelto, "devuelto", "luis.gomez@empresa.com", "2026-11-20");
+    await almacen.guardar(COLECCION_ACTIVOS, devuelto, { prestamoId: `p-${devuelto}` });
+    for (const id of [nuevo, devuelto]) {
+      const respuesta = await devolver(almacen, id);
+      expect(respuesta.statusCode).toBe(409);
+      expect(respuesta.json()).toEqual({ error: "El equipo no está prestado" });
+    }
+  });
+
+  it("responde 404 «No existe el equipo» si el equipo no existe", async () => {
+    vi.stubEnv("CORREOS_IT", "ana.perez@empresa.com");
+    const respuesta = await devolver(almacenEnMemoria(), "equipo-inexistente");
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("responde 403 «Solo IT puede hacer esto.» a una cuenta que no es de IT y sigue prestado", async () => {
+    vi.stubEnv("CORREOS_IT", "it@empresa.com");
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Monitor 03");
+    await prestar(almacen, id, "prestado", "luis.gomez@empresa.com", "2026-11-20");
+    const respuesta = await devolver(almacen, id);
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+    expect(await listarEquiposConEstado(almacen)).toEqual([
+      { id, nombre: "Monitor 03", estado: "prestado", persona: "luis.gomez@empresa.com", devolucion: "2026-11-20" },
+    ]);
+  });
+
+  it("un equipo devuelto se puede volver a prestar", async () => {
+    vi.stubEnv("CORREOS_IT", "ana.perez@empresa.com");
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Monitor 03");
+    await prestar(almacen, id, "prestado", "luis.gomez@empresa.com", "2026-11-20");
+    await devolver(almacen, id);
+    expect((await prestarEquipo(almacen, id, "eva@empresa.com", "2026-12-01")).tipo).toBe("prestado");
+  });
+
+  it("con dos devoluciones a la vez, una sale bien y la otra recibe 409", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Monitor 03");
+    await prestar(almacen, id, "prestado", "luis.gomez@empresa.com", "2026-11-20");
+    const resultados = await Promise.all([registrarDevolucion(almacen, id), registrarDevolucion(almacen, id)]);
+    expect(resultados.map((r) => r.tipo).sort()).toEqual(["devuelto", "noPrestado"]);
   });
 });
 

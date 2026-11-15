@@ -106,7 +106,63 @@ describe("pantalla Mostrador de IT", () => {
     expect((await screen.findByRole("status")).textContent).toBe("Portátil 07 entregado a ana.perez@empresa.com hasta el 2026-11-20");
     expect(await screen.findByText(/Portátil 07: prestado a ana.perez@empresa.com/)).toBeTruthy();
     expect(fetch).toHaveBeenCalledWith("/api/equipos/e1/entrega", { method: "POST", headers: { authorization: "Bearer token-de-it" } });
-    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Entregar Portátil 07" })).toBeNull();
+  });
+
+  it("apunta la devolución de un equipo prestado con el token y enseña la lista actualizada", async () => {
+    let devuelto = false;
+    const fetch = vi.fn((_ruta: string, opciones: { method: string }) => {
+      if (opciones.method === "POST") {
+        devuelto = true;
+        return Promise.resolve(respuesta({ id: "e2", nombre: "Monitor 03", estado: "disponible" }));
+      }
+      return Promise.resolve(
+        respuesta([
+          devuelto
+            ? { id: "e2", nombre: "Monitor 03", estado: "disponible" }
+            : { id: "e2", nombre: "Monitor 03", estado: "prestado", persona: "luis.gomez@empresa.com", devolucion: "2026-11-20" },
+        ]),
+      );
+    });
+    vi.stubGlobal("fetch", fetch);
+    render(<Mostrador sesion={SESION} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Apuntar devolución de Monitor 03" }));
+    expect((await screen.findByRole("status")).textContent).toBe("Monitor 03 devuelto: ya está disponible");
+    expect(await screen.findByText("Monitor 03: disponible")).toBeTruthy();
+    expect(fetch).toHaveBeenCalledWith("/api/equipos/e2/devolucion", { method: "POST", headers: { authorization: "Bearer token-de-it" } });
+    expect(screen.queryByRole("button", { name: "Apuntar devolución de Monitor 03" })).toBeNull();
+  });
+
+  it("solo ofrece apuntar la devolución de los equipos prestados", async () => {
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve(
+        respuesta([
+          { id: "e1", nombre: "Portátil 07", estado: "reservado", persona: "ana.perez@empresa.com", devolucion: "2026-11-20" },
+          { id: "e2", nombre: "Monitor 03", estado: "prestado", persona: "luis.gomez@empresa.com", devolucion: "2026-11-20" },
+          { id: "e3", nombre: "Proyector 02", estado: "disponible" },
+        ]),
+      ),
+    );
+    render(<Mostrador sesion={SESION} />);
+    await screen.findByText(/Monitor 03: prestado/);
+    expect(screen.getAllByRole("button").map((boton) => boton.textContent)).toEqual([
+      "Entregar Portátil 07",
+      "Apuntar devolución de Monitor 03",
+      "Prestar equipo",
+    ]);
+  });
+
+  it("si la API rechaza la devolución enseña su mensaje tal cual", async () => {
+    vi.stubGlobal("fetch", (_ruta: string, opciones: { method: string }) =>
+      Promise.resolve(
+        opciones.method === "POST"
+          ? respuesta({ error: "El equipo no está prestado" }, 409)
+          : respuesta([{ id: "e2", nombre: "Monitor 03", estado: "prestado", persona: "luis.gomez@empresa.com", devolucion: "2026-11-20" }]),
+      ),
+    );
+    render(<Mostrador sesion={SESION} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Apuntar devolución de Monitor 03" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("El equipo no está prestado");
   });
 
   it("si la API falla enseña su mensaje tal cual", async () => {
