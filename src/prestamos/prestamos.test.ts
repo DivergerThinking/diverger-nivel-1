@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { almacenEnMemoria, type Almacen } from "../../lib/datos.js";
 import { darDeAlta } from "../equipos/equipos.js";
 import { rutas } from "./index.js";
-import { COLECCION_ACTIVOS, COLECCION_PRESTAMOS, entregarEquipo, esFechaReal, hoyEnMadrid, listarEquiposConEstado, prestarEquipo, solicitarEquipo, type Prestamo } from "./prestamos.js";
+import { COLECCION_ACTIVOS, COLECCION_PRESTAMOS, consultarHistorial, entregarEquipo, esFechaReal, hoyEnMadrid, listarEquiposConEstado, prestarEquipo, solicitarEquipo, type Prestamo } from "./prestamos.js";
 
 async function servidor(almacen: Almacen) {
   const app = Fastify();
@@ -408,6 +408,74 @@ describe("solicitarEquipo con la fecha de hoy en Madrid", () => {
     expect(await solicitarEquipo(almacen, id, "ana.perez@empresa.com", "2026-02-30", ahora)).toEqual({ tipo: "fechaNoValida" });
     expect(await solicitarEquipo(almacen, id, "ana.perez@empresa.com", undefined, ahora)).toEqual({ tipo: "sinFecha" });
     expect(await listarEquiposConEstado(almacen)).toEqual([{ id, nombre: "Portátil 07", estado: "disponible" }]);
+  });
+});
+
+describe("peticiones simultáneas sobre el mismo equipo", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const NO_DISPONIBLE = { error: "El equipo no está disponible" };
+
+  it("con dos solicitudes de personas distintas, una recibe 201 reservado a su nombre y la otra 409", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Monitor 03");
+    const [app1, app2] = await Promise.all([servidor(almacen), servidor(almacen)]);
+    const respuestas = await Promise.all([
+      app1.inject({ method: "POST", url: `/api/equipos/${id}/solicitud`, payload: { devolucion: "2999-11-20" } }),
+      app2.inject({ method: "POST", url: `/api/equipos/${id}/solicitud`, payload: { devolucion: "2999-11-20" } }),
+    ]);
+    const buenas = respuestas.filter((r) => r.statusCode === 201);
+    const malas = respuestas.filter((r) => r.statusCode === 409);
+    expect(buenas).toHaveLength(1);
+    expect(malas).toHaveLength(1);
+    expect(buenas[0]?.json()).toMatchObject({ nombre: "Monitor 03", estado: "reservado", persona: "ana.perez@empresa.com" });
+    expect(malas[0]?.json()).toEqual(NO_DISPONIBLE);
+  });
+
+  it("con una solicitud y un préstamo en el mostrador por HTTP, uno recibe 201, el otro 409 y el equipo queda a nombre de una sola persona", async () => {
+    vi.stubEnv("CORREOS_IT", "ana.perez@empresa.com");
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Monitor 03");
+    const app = await servidor(almacen);
+    const respuestas = await Promise.all([
+      app.inject({ method: "POST", url: `/api/equipos/${id}/solicitud`, payload: { devolucion: "2999-11-20" } }),
+      app.inject({ method: "POST", url: `/api/equipos/${id}/prestamo`, payload: { persona: "luis.gomez@empresa.com", devolucion: "2999-11-21" } }),
+    ]);
+    expect(respuestas.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+    expect(respuestas.find((r) => r.statusCode === 409)?.json()).toEqual(NO_DISPONIBLE);
+    const equipos = await listarEquiposConEstado(almacen);
+    expect(equipos).toHaveLength(1);
+    expect(equipos[0]?.persona).toBe(respuestas.find((r) => r.statusCode === 201)?.json<{ persona: string }>().persona);
+    expect(await almacen.listar(COLECCION_PRESTAMOS)).toHaveLength(1);
+  });
+
+  it("con 20 solicitudes de 20 empleados, exactamente una recibe 201, 19 reciben 409 y el historial tiene una sola reserva", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Portátil 07");
+    const resultados = await Promise.all(
+      Array.from({ length: 20 }, (_, i) => solicitarEquipo(almacen, id, `empleado${i}@empresa.com`, "2999-11-20")),
+    );
+    expect(resultados.filter((r) => r.tipo === "reservado")).toHaveLength(1);
+    expect(resultados.filter((r) => r.tipo === "noDisponible")).toHaveLength(19);
+    const historial = await consultarHistorial(almacen, id);
+    expect(historial).toHaveLength(1);
+    expect(historial?.[0]?.estado).toBe("reservado");
+  });
+
+  it("con 20 solicitudes por HTTP, 19 respuestas son 409 «El equipo no está disponible»", async () => {
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Portátil 07");
+    const app = await servidor(almacen);
+    const respuestas = await Promise.all(
+      Array.from({ length: 20 }, () => app.inject({ method: "POST", url: `/api/equipos/${id}/solicitud`, payload: { devolucion: "2999-11-20" } })),
+    );
+    expect(respuestas.filter((r) => r.statusCode === 201)).toHaveLength(1);
+    const rechazadas = respuestas.filter((r) => r.statusCode === 409);
+    expect(rechazadas).toHaveLength(19);
+    for (const r of rechazadas) expect(r.json()).toEqual(NO_DISPONIBLE);
+    expect(await almacen.listar(COLECCION_PRESTAMOS)).toHaveLength(1);
   });
 });
 
