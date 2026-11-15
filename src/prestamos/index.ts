@@ -12,6 +12,7 @@ import {
   FECHA_NO_VALIDA,
   FECHA_PASADA,
   listarEquiposConEstado,
+  listarVencidos,
   NO_DISPONIBLE,
   NO_EXISTE_EQUIPO,
   NO_PRESTADO,
@@ -21,7 +22,14 @@ import {
   solicitarEquipo,
 } from "./prestamos.js";
 
-export { consultarHistorial, listarEquiposConEstado, type EntradaHistorial, type EquipoConEstado } from "./prestamos.js";
+export {
+  consultarHistorial,
+  listarEquiposConEstado,
+  listarVencidos,
+  type EntradaHistorial,
+  type EquipoConEstado,
+  type Vencido,
+} from "./prestamos.js";
 
 type Equipo = components["schemas"]["Equipo"];
 type Solicitud = components["schemas"]["Solicitud"];
@@ -95,6 +103,10 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
       return reply.code(codigo).send(cuerpo);
     },
   );
+  app.get("/api/prestamos/vencidos", { preHandler: soloIT }, async (_request, reply) => {
+    const vencidos: components["schemas"]["Vencido"][] = await listarVencidos(almacen);
+    return reply.code(200).send(vencidos);
+  });
   app.get<{ Params: { id: string } }>("/api/equipos/:id/historial", { preHandler: soloIT }, async (request, reply) => {
     const historial: EntradaDelContrato[] | undefined = await consultarHistorial(almacen, request.params.id);
     if (!historial) {
