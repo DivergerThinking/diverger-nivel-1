@@ -8,12 +8,14 @@ import {
   consultarHistorial,
   entregarEquipo,
   FALTA_FECHA,
+  FALTAN_DATOS,
   FECHA_NO_VALIDA,
   FECHA_PASADA,
   listarEquiposConEstado,
   NO_DISPONIBLE,
   NO_EXISTE_EQUIPO,
   NO_RESERVADO,
+  prestarEquipo,
   solicitarEquipo,
 } from "./prestamos.js";
 
@@ -21,6 +23,7 @@ export { consultarHistorial, listarEquiposConEstado, type EntradaHistorial, type
 
 type Equipo = components["schemas"]["Equipo"];
 type Solicitud = components["schemas"]["Solicitud"];
+type PrestamoMostrador = components["schemas"]["PrestamoMostrador"];
 type EntradaDelContrato = components["schemas"]["EntradaHistorial"];
 type Error = components["schemas"]["Error"];
 
@@ -61,6 +64,26 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     const cuerpo: Error = { error: resultado.tipo === "noExiste" ? NO_EXISTE_EQUIPO : NO_RESERVADO };
     return reply.code(resultado.tipo === "noExiste" ? 404 : 409).send(cuerpo);
   });
+  app.post<{ Params: { id: string }; Body: PrestamoMostrador | null }>(
+    "/api/equipos/:id/prestamo",
+    { preHandler: soloIT },
+    async (request, reply) => {
+      const resultado = await prestarEquipo(almacen, request.params.id, request.body?.persona, request.body?.devolucion);
+      if (resultado.tipo === "prestado") {
+        const equipo: Equipo = resultado.equipo;
+        return reply.code(201).send(equipo);
+      }
+      const fallos: Record<typeof resultado.tipo, [number, string]> = {
+        faltanDatos: [400, FALTAN_DATOS],
+        fechaNoValida: [400, FECHA_NO_VALIDA],
+        noExiste: [404, NO_EXISTE_EQUIPO],
+        noDisponible: [409, NO_DISPONIBLE],
+      };
+      const [codigo, mensaje] = fallos[resultado.tipo];
+      const cuerpo: Error = { error: mensaje };
+      return reply.code(codigo).send(cuerpo);
+    },
+  );
   app.get<{ Params: { id: string } }>("/api/equipos/:id/historial", { preHandler: soloIT }, async (request, reply) => {
     const historial: EntradaDelContrato[] | undefined = await consultarHistorial(almacen, request.params.id);
     if (!historial) {
