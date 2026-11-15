@@ -87,6 +87,33 @@ describe("GET /api/equipos", () => {
   });
 });
 
+describe("ver los equipos y su estado (HU-SOL-01)", () => {
+  it("enseña disponible sin persona ni devolución y prestado con persona y devolución", async () => {
+    const libre = await darDeAlta("Portátil 07");
+    const prestado = await darDeAlta("Monitor 03");
+    await almacen.guardar("prestamos_estados", prestado, {
+      equipoId: prestado,
+      estado: "prestado",
+      persona: "luis.gomez@empresa.com",
+      devolucion: "2026-11-20",
+      prestamoId: "prestamo-1",
+    });
+    const respuesta = await app.inject({ url: "/api/equipos", headers: con("ana") });
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual([
+      { id: prestado, nombre: "Monitor 03", estado: "prestado", persona: "luis.gomez@empresa.com", devolucion: "2026-11-20" },
+      { id: libre, nombre: "Portátil 07", estado: "disponible" },
+    ]);
+  });
+
+  it("responde 401 sin token de identidad y no lista ningún equipo", async () => {
+    await darDeAlta("Portátil 07");
+    const respuesta = await app.inject("/api/equipos");
+    expect(respuesta.statusCode).toBe(401);
+    expect(respuesta.json()).toEqual({ error: "Inicia sesión con Google." });
+  });
+});
+
 describe("POST /api/equipos/{id}/solicitud", () => {
   it("responde 400 si falta la fecha", async () => {
     const id = await darDeAlta("Portátil 07");
