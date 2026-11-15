@@ -4,7 +4,7 @@ import { crearServidor } from "../../app/server.js";
 import { almacenEnMemoria, type Almacen } from "../../lib/datos.js";
 import { rutas as rutasDeEquipos } from "../equipos/index.js";
 import { rutas } from "./index.js";
-import { hoyEnMadrid, solicitarEquipo } from "./prestamos.js";
+import { hoyEnMadrid, listarVencidos, solicitarEquipo } from "./prestamos.js";
 
 const PERSONAS: Record<string, { email: string; nombre: string }> = {
   it: { email: "it@empresa.com", nombre: "IT" },
@@ -427,6 +427,60 @@ describe("POST /api/equipos/{id}/devolucion (HU-PRE-03)", () => {
   it("responde 401 sin token de identidad", async () => {
     const respuesta = await app.inject({ method: "POST", url: "/api/equipos/x/devolucion" });
     expect(respuesta.statusCode).toBe(401);
+  });
+});
+
+describe("GET /api/prestamos/vencidos (HU-PRE-04)", () => {
+  const prestar = (id: string, devolucion: string) =>
+    app.inject({
+      method: "POST",
+      url: `/api/equipos/${id}/prestamo`,
+      headers: con("it"),
+      payload: { persona: "ana.perez@empresa.com", devolucion },
+    });
+
+  it("lista los prestados vencidos del más antiguo al más reciente, sin los que vencen hoy o después", async () => {
+    const portatil = await darDeAlta("Portátil 07");
+    const monitor = await darDeAlta("Monitor 03");
+    const proyector = await darDeAlta("Proyector 01");
+    await prestar(portatil, "2026-11-12");
+    await prestar(monitor, "2026-11-10");
+    await prestar(proyector, hoyEnMadrid());
+    const respuesta = await app.inject({ url: "/api/prestamos/vencidos", headers: con("it") });
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual([
+      { id: monitor, nombre: "Monitor 03", persona: "ana.perez@empresa.com", devolucion: "2026-11-10" },
+      { id: portatil, nombre: "Portátil 07", persona: "ana.perez@empresa.com", devolucion: "2026-11-12" },
+    ]);
+  });
+
+  it("compara con el día dado: el que vence ese día no está vencido", async () => {
+    const id = await darDeAlta("Proyector 01");
+    await prestar(id, "2026-11-15");
+    expect(await listarVencidos(almacen, "2026-11-15")).toEqual([]);
+    expect(await listarVencidos(almacen, "2026-11-16")).toHaveLength(1);
+  });
+
+  it("no incluye un equipo reservado sin entregar aunque su devolución sea futura", async () => {
+    const id = await darDeAlta("Portátil 08");
+    await solicitarEquipo(almacen, id, "ana.perez@empresa.com", "2026-11-16", "2026-11-15");
+    const respuesta = await app.inject({ url: "/api/prestamos/vencidos", headers: con("it") });
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual([]);
+  });
+
+  it("no incluye un equipo devuelto", async () => {
+    const id = await darDeAlta("Portátil 07");
+    await prestar(id, "2026-11-10");
+    await app.inject({ method: "POST", url: `/api/equipos/${id}/devolucion`, headers: con("it") });
+    const respuesta = await app.inject({ url: "/api/prestamos/vencidos", headers: con("it") });
+    expect(respuesta.json()).toEqual([]);
+  });
+
+  it("responde 403 a quien no es de IT", async () => {
+    const respuesta = await app.inject({ url: "/api/prestamos/vencidos", headers: con("ana") });
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
   });
 });
 
