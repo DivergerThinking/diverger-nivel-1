@@ -29,6 +29,7 @@ export const FALTAN_DATOS = "Faltan la persona o la fecha de devolución";
 export const NO_EXISTE_EQUIPO = "No existe el equipo";
 export const NO_DISPONIBLE = "El equipo no está disponible";
 export const NO_RESERVADO = "El equipo no está reservado";
+export const NO_PRESTADO = "El equipo no está prestado";
 
 /** Error de una regla del contexto, con el código HTTP que le toca. */
 export class ErrorDePrestamos extends Error {
@@ -88,6 +89,21 @@ export async function entregarEquipo(almacen: Almacen, id: string): Promise<Equi
     tx.guardar(COLECCION_ESTADOS, id, estado);
     if (prestamo) tx.guardar(COLECCION_HISTORIAL, actual.prestamoId, { ...prestamo, estado: "prestado" });
     return aEquipo(equipo, estado);
+  });
+}
+
+/** Apunta la devolución de un equipo prestado: vuelve a estar disponible y su préstamo queda como devuelto. */
+export async function registrarDevolucion(almacen: Almacen, id: string): Promise<Equipo> {
+  const equipo = await obtenerEquipo(almacen, id);
+  if (!equipo) throw new ErrorDePrestamos(404, NO_EXISTE_EQUIPO);
+
+  return almacen.transaccion(async (tx) => {
+    const actual = await tx.obtener<DocumentoEstado>(COLECCION_ESTADOS, id);
+    if (actual?.estado !== "prestado") throw new ErrorDePrestamos(409, NO_PRESTADO);
+    const prestamo = await tx.obtener<DocumentoPrestamo>(COLECCION_HISTORIAL, actual.prestamoId);
+    tx.borrar(COLECCION_ESTADOS, id);
+    if (prestamo) tx.guardar(COLECCION_HISTORIAL, actual.prestamoId, { ...prestamo, estado: "devuelto" });
+    return aEquipo(equipo, undefined);
   });
 }
 

@@ -92,6 +92,39 @@ describe("pantalla Gestión de préstamos", () => {
     expect((await screen.findByRole("alert")).textContent).toBe(mensaje);
   });
 
+  it("ofrece apuntar la devolución solo de los equipos prestados, con el token de la sesión", async () => {
+    const prestados = [{ id: "m3", nombre: "Monitor 03", estado: "prestado", persona: "luis.gomez@empresa.com", devolucion: "2026-11-20" }, ...LISTA];
+    const fetch = vi.fn((_ruta: string, opciones: { method: string }) =>
+      Promise.resolve(opciones.method === "POST" ? respuesta({ id: "m3", nombre: "Monitor 03", estado: "disponible" }) : respuesta(prestados)),
+    );
+    vi.stubGlobal("fetch", fetch);
+    render(<GestionPrestamos sesion={SESION} />);
+    expect(screen.queryByRole("button", { name: "Apuntar devolución de Portátil 07" })).toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "Apuntar devolución de Monitor 03" }));
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith("/api/equipos/m3/devolucion", {
+        method: "POST",
+        headers: { authorization: "Bearer token-de-it" },
+      });
+    });
+    await waitFor(() => {
+      expect(fetch.mock.calls.filter(([ruta]) => ruta === "/api/equipos")).toHaveLength(2);
+    });
+  });
+
+  it.each([
+    [409, "El equipo no está prestado"],
+    [404, "No existe el equipo"],
+  ])("enseña el mensaje de la API tal cual si la devolución falla con %i: %s", async (estado, mensaje) => {
+    const prestado = [{ id: "m3", nombre: "Monitor 03", estado: "prestado", persona: "luis.gomez@empresa.com", devolucion: "2026-11-20" }];
+    vi.stubGlobal("fetch", (_ruta: string, opciones: { method: string }) =>
+      Promise.resolve(opciones.method === "POST" ? respuesta({ error: mensaje }, estado) : respuesta(prestado)),
+    );
+    render(<GestionPrestamos sesion={SESION} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Apuntar devolución de Monitor 03" }));
+    expect((await screen.findByRole("alert")).textContent).toBe(mensaje);
+  });
+
   it("enseña «No existe el equipo» si la API responde 404 al entregar", async () => {
     vi.stubGlobal("fetch", (_ruta: string, opciones: { method: string }) =>
       Promise.resolve(opciones.method === "POST" ? respuesta({ error: "No existe el equipo" }, 404) : respuesta(LISTA)),

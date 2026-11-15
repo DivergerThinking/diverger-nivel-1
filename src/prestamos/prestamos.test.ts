@@ -358,6 +358,78 @@ describe("POST /api/equipos/{id}/prestamo (HU-PRE-02)", () => {
   });
 });
 
+describe("POST /api/equipos/{id}/devolucion (HU-PRE-03)", () => {
+  const devolver = (token: string, id: string) =>
+    app.inject({ method: "POST", url: `/api/equipos/${id}/devolucion`, headers: con(token) });
+  const prestar = (id: string) =>
+    app.inject({
+      method: "POST",
+      url: `/api/equipos/${id}/prestamo`,
+      headers: con("it"),
+      payload: { persona: "ana.perez@empresa.com", devolucion: "2026-11-20" },
+    });
+  const estadoDe = async (id: string) =>
+    (await app.inject({ url: "/api/equipos", headers: con("it") })).json<{ id: string; estado: string }[]>().find(
+      (equipo) => equipo.id === id,
+    );
+
+  it("deja disponible un equipo prestado, sin persona ni devolución", async () => {
+    const id = await darDeAlta("Portátil 07");
+    await prestar(id);
+    const respuesta = await devolver("it", id);
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual({ id, nombre: "Portátil 07", estado: "disponible" });
+    expect(await estadoDe(id)).toEqual({ id, nombre: "Portátil 07", estado: "disponible" });
+  });
+
+  it("marca como devuelto el préstamo del historial y deja volver a reservar el equipo", async () => {
+    const id = await darDeAlta("Portátil 07");
+    await prestar(id);
+    await devolver("it", id);
+    expect((await almacen.listar<{ estado: string }>("prestamos_historial")).map((p) => p.estado)).toEqual(["devuelto"]);
+    expect((await solicitar("luis", id, { devolucion: "2999-11-20" })).statusCode).toBe(201);
+  });
+
+  it("responde 409 si el equipo está reservado y sigue reservado", async () => {
+    const id = await darDeAlta("Monitor 03");
+    await solicitar("luis", id, { devolucion: "2999-11-20" });
+    const respuesta = await devolver("it", id);
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está prestado" });
+    expect((await estadoDe(id))?.estado).toBe("reservado");
+  });
+
+  it("responde 409 si el equipo está disponible o ya se devolvió", async () => {
+    const id = await darDeAlta("Monitor 03");
+    const libre = await devolver("it", id);
+    expect(libre.statusCode).toBe(409);
+    expect(libre.json()).toEqual({ error: "El equipo no está prestado" });
+    await prestar(id);
+    await devolver("it", id);
+    expect((await devolver("it", id)).statusCode).toBe(409);
+  });
+
+  it("responde 404 si el id no es de ningún equipo", async () => {
+    const respuesta = await devolver("it", "no-existe");
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("responde 403 a quien no es de IT y no cambia el equipo", async () => {
+    const id = await darDeAlta("Portátil 07");
+    await prestar(id);
+    const respuesta = await devolver("ana", id);
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+    expect((await estadoDe(id))?.estado).toBe("prestado");
+  });
+
+  it("responde 401 sin token de identidad", async () => {
+    const respuesta = await app.inject({ method: "POST", url: "/api/equipos/x/devolucion" });
+    expect(respuesta.statusCode).toBe(401);
+  });
+});
+
 describe("hoyEnMadrid", () => {
   it("da el día de Madrid, no el de UTC", () => {
     expect(hoyEnMadrid(new Date("2026-11-15T23:30:00Z"))).toBe("2026-11-16");
