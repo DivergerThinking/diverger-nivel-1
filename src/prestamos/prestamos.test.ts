@@ -129,6 +129,8 @@ describe("POST /api/equipos/{id}/solicitud", () => {
       expect(respuesta.statusCode).toBe(400);
       expect(respuesta.json()).toEqual({ error: "La fecha de devolución no es válida" });
     }
+    const [equipo] = (await app.inject({ url: "/api/equipos", headers: con("ana") })).json<{ estado: string }[]>();
+    expect(equipo?.estado).toBe("disponible");
   });
 
   it("responde 400 si la fecha ya ha pasado y deja el equipo disponible", async () => {
@@ -155,6 +157,10 @@ describe("POST /api/equipos/{id}/solicitud", () => {
     const respuesta = await solicitar("ana", id, { devolucion: "2999-11-20" });
     expect(respuesta.statusCode).toBe(409);
     expect(respuesta.json()).toEqual({ error: "El equipo no está disponible" });
+    const [equipo] = (await app.inject({ url: "/api/equipos", headers: con("ana") })).json<
+      { estado: string; persona?: string }[]
+    >();
+    expect(equipo).toMatchObject({ estado: "reservado", persona: "luis.gomez@empresa.com" });
   });
 
   it("responde 404 si el id no es de ningún equipo", async () => {
