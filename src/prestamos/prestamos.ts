@@ -93,6 +93,46 @@ export async function solicitarEquipo(
   });
 }
 
+export const FALTAN_DATOS = "Faltan la persona o la fecha de devolución";
+
+export type ResultadoPrestamo =
+  | { tipo: "prestado"; equipo: EquipoConEstado }
+  | { tipo: "faltanDatos" }
+  | { tipo: "fechaNoValida" }
+  | { tipo: "noExiste" }
+  | { tipo: "noDisponible" };
+
+/**
+ * Presta en el mostrador un equipo disponible a la persona, con su fecha de devolución (que puede ser anterior a hoy).
+ * Lee el préstamo activo y escribe en una sola transacción, para que dos peticiones a la vez no presten el mismo equipo.
+ */
+export async function prestarEquipo(
+  almacen: Almacen,
+  equipoId: string,
+  persona: unknown,
+  devolucion: unknown,
+  ahora: Date = new Date(),
+): Promise<ResultadoPrestamo> {
+  if (typeof persona !== "string" || persona.trim() === "" || typeof devolucion !== "string" || devolucion.trim() === "") {
+    return { tipo: "faltanDatos" };
+  }
+  if (!esFechaReal(devolucion)) return { tipo: "fechaNoValida" };
+  const equipo = await obtenerEquipo(almacen, equipoId);
+  if (!equipo) return { tipo: "noExiste" };
+  const correo = persona.trim();
+  return almacen.transaccion<ResultadoPrestamo>(async (tx) => {
+    const activo = await tx.obtener<Activo>(COLECCION_ACTIVOS, equipoId);
+    const vigente = activo && (await tx.obtener<Prestamo>(COLECCION_PRESTAMOS, activo.prestamoId));
+    if (vigente && vigente.estado !== "devuelto") return { tipo: "noDisponible" };
+    const id = randomUUID();
+    const prestamo: Prestamo = { id, equipoId, persona: correo, devolucion, estado: "prestado", creadoEn: ahora.toISOString() };
+    tx.guardar(COLECCION_PRESTAMOS, id, prestamo);
+    const nuevoActivo: Activo = { prestamoId: id };
+    tx.guardar(COLECCION_ACTIVOS, equipoId, nuevoActivo);
+    return { tipo: "prestado", equipo: { id: equipo.id, nombre: equipo.nombre, estado: "prestado", persona: correo, devolucion } };
+  });
+}
+
 export const NO_RESERVADO = "El equipo no está reservado";
 
 export type ResultadoEntrega =
