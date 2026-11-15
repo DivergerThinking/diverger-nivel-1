@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { almacenEnMemoria, type Almacen } from "../../lib/datos.js";
 import { darDeAlta } from "../equipos/equipos.js";
 import { rutas } from "./index.js";
-import { COLECCION_ACTIVOS, COLECCION_PRESTAMOS, consultarHistorial, entregarEquipo, esFechaReal, hoyEnMadrid, listarEquiposConEstado, prestarEquipo, registrarDevolucion, solicitarEquipo, type Prestamo } from "./prestamos.js";
+import { COLECCION_ACTIVOS, COLECCION_PRESTAMOS, consultarHistorial, entregarEquipo, esFechaReal, hoyEnMadrid, listarEquiposConEstado, listarVencidos, prestarEquipo, registrarDevolucion, solicitarEquipo, type Prestamo } from "./prestamos.js";
 
 async function servidor(almacen: Almacen) {
   const app = Fastify();
@@ -32,6 +32,51 @@ async function prestar(almacen: Almacen, equipoId: string, estado: Prestamo["est
 async function guardarPrestamo(almacen: Almacen, p: Prestamo) {
   await almacen.guardar(COLECCION_PRESTAMOS, p.id, p);
 }
+
+describe("GET /api/prestamos/vencidos", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("responde 200 con los prestados vencidos, del más antiguo al más reciente", async () => {
+    vi.stubEnv("CORREOS_IT", "ana.perez@empresa.com");
+    const almacen = almacenEnMemoria();
+    const proyector = await equipoNuevo(almacen, "Proyector 02");
+    const monitor = await equipoNuevo(almacen, "Monitor 03");
+    await prestar(almacen, proyector, "prestado", "ana.perez@empresa.com", "2026-11-12");
+    await prestar(almacen, monitor, "prestado", "luis.gomez@empresa.com", "2026-11-10");
+    const app = await servidor(almacen);
+    const respuesta = await app.inject("/api/prestamos/vencidos");
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual([
+      { id: monitor, nombre: "Monitor 03", persona: "luis.gomez@empresa.com", devolucion: "2026-11-10" },
+      { id: proyector, nombre: "Proyector 02", persona: "ana.perez@empresa.com", devolucion: "2026-11-12" },
+    ]);
+  });
+
+  it("no incluye los que vencen hoy, los reservados, los devueltos ni los disponibles", async () => {
+    const almacen = almacenEnMemoria();
+    const hoy = await equipoNuevo(almacen, "Portátil 07");
+    const reservado = await equipoNuevo(almacen, "Cámara 01");
+    const devuelto = await equipoNuevo(almacen, "Monitor 04");
+    await equipoNuevo(almacen, "Ratón 05");
+    await prestar(almacen, hoy, "prestado", "ana.perez@empresa.com", "2026-11-14");
+    await prestar(almacen, reservado, "reservado", "ana.perez@empresa.com", "2026-11-01");
+    await prestar(almacen, devuelto, "devuelto", "ana.perez@empresa.com", "2026-11-01");
+    expect(await listarVencidos(almacen, new Date("2026-11-14T10:00:00Z"))).toEqual([]);
+  });
+
+  it("responde 403 «Solo IT puede hacer esto.» y ninguna lista a una cuenta que no es de IT", async () => {
+    vi.stubEnv("CORREOS_IT", "it@empresa.com,soporte@empresa.com");
+    const almacen = almacenEnMemoria();
+    const id = await equipoNuevo(almacen, "Proyector 02");
+    await prestar(almacen, id, "prestado", "ana.perez@empresa.com", "2026-11-12");
+    const app = await servidor(almacen);
+    const respuesta = await app.inject("/api/prestamos/vencidos");
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+  });
+});
 
 describe("GET /api/equipos/:id/historial", () => {
   afterEach(() => {

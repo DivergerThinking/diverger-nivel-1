@@ -192,6 +192,26 @@ export async function consultarHistorial(almacen: Almacen, equipoId: string): Pr
     .map(({ persona, devolucion, estado }) => ({ persona, devolucion, estado }));
 }
 
+export interface Vencido {
+  id: string;
+  nombre: string;
+  persona: string;
+  devolucion: string;
+}
+
+/** Los equipos prestados cuya devolución es anterior a hoy en Madrid, del más antiguo al más reciente. */
+export async function listarVencidos(almacen: Almacen, ahora: Date = new Date()): Promise<Vencido[]> {
+  const hoy = hoyEnMadrid(ahora);
+  const equipos = await listarEquiposConEstado(almacen);
+  const vencidos: Vencido[] = [];
+  for (const { id, nombre, estado, persona, devolucion } of equipos) {
+    if (estado === "prestado" && persona !== undefined && devolucion !== undefined && devolucion < hoy) {
+      vencidos.push({ id, nombre, persona, devolucion });
+    }
+  }
+  return vencidos.sort((a, b) => (a.devolucion < b.devolucion ? -1 : a.devolucion > b.devolucion ? 1 : 0));
+}
+
 /** Todos los equipos con su estado; si está reservado o prestado, también la persona y la fecha de devolución. */
 export async function listarEquiposConEstado(almacen: Almacen): Promise<EquipoConEstado[]> {
   const [equipos, activos, prestamos] = await Promise.all([
