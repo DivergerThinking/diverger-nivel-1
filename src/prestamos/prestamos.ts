@@ -27,6 +27,7 @@ export const FECHA_NO_VALIDA = "La fecha de devolución no es válida";
 export const FECHA_PASADA = "La fecha de devolución ya ha pasado";
 export const NO_EXISTE_EQUIPO = "No existe el equipo";
 export const NO_DISPONIBLE = "El equipo no está disponible";
+export const NO_RESERVADO = "El equipo no está reservado";
 
 /** Error de una regla del contexto, con el código HTTP que le toca. */
 export class ErrorDePrestamos extends Error {
@@ -71,6 +72,22 @@ export async function listarEquiposConEstado(almacen: Almacen): Promise<Equipo[]
   const [equipos, estados] = await Promise.all([listarEquipos(almacen), almacen.listar<DocumentoEstado>(COLECCION_ESTADOS)]);
   const porEquipo = new Map(estados.map((estado) => [estado.equipoId, estado]));
   return equipos.map((equipo) => aEquipo(equipo, porEquipo.get(equipo.id)));
+}
+
+/** Entrega un equipo reservado: pasa a prestado con la misma persona y fecha de devolución. */
+export async function entregarEquipo(almacen: Almacen, id: string): Promise<Equipo> {
+  const equipo = await obtenerEquipo(almacen, id);
+  if (!equipo) throw new ErrorDePrestamos(404, NO_EXISTE_EQUIPO);
+
+  return almacen.transaccion(async (tx) => {
+    const actual = await tx.obtener<DocumentoEstado>(COLECCION_ESTADOS, id);
+    if (actual?.estado !== "reservado") throw new ErrorDePrestamos(409, NO_RESERVADO);
+    const prestamo = await tx.obtener<DocumentoPrestamo>(COLECCION_HISTORIAL, actual.prestamoId);
+    const estado: DocumentoEstado = { ...actual, estado: "prestado" };
+    tx.guardar(COLECCION_ESTADOS, id, estado);
+    if (prestamo) tx.guardar(COLECCION_HISTORIAL, actual.prestamoId, { ...prestamo, estado: "prestado" });
+    return aEquipo(equipo, estado);
+  });
 }
 
 /** Reserva el equipo a nombre de `persona`; solo si está disponible. `hoy` es el día actual en Madrid. */

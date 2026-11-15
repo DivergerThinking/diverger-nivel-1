@@ -179,6 +179,74 @@ describe("POST /api/equipos/{id}/solicitud", () => {
   });
 });
 
+describe("POST /api/equipos/{id}/entrega (HU-PRE-01)", () => {
+  const entregar = (token: string, id: string) =>
+    app.inject({ method: "POST", url: `/api/equipos/${id}/entrega`, headers: con(token) });
+
+  it("pasa a prestado un equipo reservado, con la misma persona y devolución", async () => {
+    const id = await darDeAlta("Portátil 07");
+    await solicitar("ana", id, { devolucion: "2999-11-20" });
+    const respuesta = await entregar("it", id);
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual({
+      id,
+      nombre: "Portátil 07",
+      estado: "prestado",
+      persona: "ana.perez@empresa.com",
+      devolucion: "2999-11-20",
+    });
+    const [equipo] = (await app.inject({ url: "/api/equipos", headers: con("ana") })).json<{ estado: string }[]>();
+    expect(equipo?.estado).toBe("prestado");
+  });
+
+  it("marca como prestado el préstamo del historial", async () => {
+    const id = await darDeAlta("Portátil 07");
+    await solicitar("ana", id, { devolucion: "2999-11-20" });
+    await entregar("it", id);
+    const historial = await almacen.listar<{ estado: string }>("prestamos_historial");
+    expect(historial.map((p) => p.estado)).toEqual(["prestado"]);
+  });
+
+  it("responde 409 si el equipo está disponible y lo deja disponible", async () => {
+    const id = await darDeAlta("Monitor 03");
+    const respuesta = await entregar("it", id);
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está reservado" });
+    const [equipo] = (await app.inject({ url: "/api/equipos", headers: con("ana") })).json<{ estado: string }[]>();
+    expect(equipo?.estado).toBe("disponible");
+  });
+
+  it("responde 409 si el equipo ya está prestado", async () => {
+    const id = await darDeAlta("Monitor 03");
+    await solicitar("ana", id, { devolucion: "2999-11-20" });
+    await entregar("it", id);
+    const respuesta = await entregar("it", id);
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está reservado" });
+  });
+
+  it("responde 404 si el id no es de ningún equipo", async () => {
+    const respuesta = await entregar("it", "no-existe");
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("responde 403 a quien no es de IT y no cambia el equipo", async () => {
+    const id = await darDeAlta("Portátil 07");
+    await solicitar("ana", id, { devolucion: "2999-11-20" });
+    const respuesta = await entregar("ana", id);
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+    const [equipo] = (await app.inject({ url: "/api/equipos", headers: con("ana") })).json<{ estado: string }[]>();
+    expect(equipo?.estado).toBe("reservado");
+  });
+
+  it("responde 401 sin token de identidad", async () => {
+    const respuesta = await app.inject({ method: "POST", url: "/api/equipos/x/entrega" });
+    expect(respuesta.statusCode).toBe(401);
+  });
+});
+
 describe("hoyEnMadrid", () => {
   it("da el día de Madrid, no el de UTC", () => {
     expect(hoyEnMadrid(new Date("2026-11-15T23:30:00Z"))).toBe("2026-11-16");
