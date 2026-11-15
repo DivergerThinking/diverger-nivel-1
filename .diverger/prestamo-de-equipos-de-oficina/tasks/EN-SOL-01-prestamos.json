@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "EN-SOL-01-prestamos",
   "title": "Préstamos: impedir que un equipo se reserve o preste dos veces (EN-SOL-01)",
-  "status": "pending",
+  "status": "done",
   "story": "EN-SOL-01",
   "context": "prestamos",
   "modules": ["src/prestamos"],

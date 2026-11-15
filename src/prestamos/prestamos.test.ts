@@ -176,6 +176,13 @@ describe("POST /api/equipos/{id}/solicitud", () => {
       solicitar("luis", id, { devolucion: "2999-11-20" }),
     ]);
     expect(respuestas.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+    const ganadora = respuestas.find((r) => r.statusCode === 201);
+    const perdedora = respuestas.find((r) => r.statusCode === 409);
+    expect(ganadora?.json()).toMatchObject({ id, estado: "reservado" });
+    expect(perdedora?.json()).toEqual({ error: "El equipo no está disponible" });
+    const lista = (await app.inject({ url: "/api/equipos", headers: con("ana") })).json<{ id: string; persona?: string }[]>();
+    expect(lista.find((equipo) => equipo.id === id)?.persona).toBe(ganadora?.json<{ persona: string }>().persona);
+    expect(await almacen.listar("prestamos_historial")).toHaveLength(1);
   });
 });
 
@@ -341,6 +348,13 @@ describe("POST /api/equipos/{id}/prestamo (HU-PRE-02)", () => {
       prestar("it", id, { persona: "luis.gomez@empresa.com", devolucion: "2026-11-20" }),
     ]);
     expect(respuestas.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+    const ganadora = respuestas.find((r) => r.statusCode === 201);
+    const perdedora = respuestas.find((r) => r.statusCode === 409);
+    expect(["reservado", "prestado"]).toContain(ganadora?.json<{ estado: string }>().estado);
+    expect(perdedora?.json()).toEqual({ error: "El equipo no está disponible" });
+    const actual = await estadoDe(id);
+    expect(actual).toMatchObject({ estado: ganadora?.json<{ estado: string }>().estado, persona: ganadora?.json<{ persona: string }>().persona });
+    expect(await almacen.listar("prestamos_historial")).toHaveLength(1);
   });
 });
 
