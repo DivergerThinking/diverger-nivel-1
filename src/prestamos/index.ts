@@ -8,6 +8,7 @@ import {
   entregarEquipo,
   listarEquiposConEstado,
   listarVencidos,
+  obtenerHistorial,
   prestarEquipo,
   registrarDevolucion,
   solicitarEquipo,
@@ -66,6 +67,17 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
   app.get("/api/prestamos/vencidos", async (request, reply) => {
     if (!esCuentaDeIT(request.persona?.email ?? "")) return reply.code(403).send({ error: SOLO_IT });
     return reply.code(200).send(await listarVencidos(almacen));
+  });
+
+  app.get("/api/equipos/:id/historial", async (request, reply) => {
+    if (!esCuentaDeIT(request.persona?.email ?? "")) return reply.code(403).send({ error: SOLO_IT });
+    const { id } = request.params as { id: string };
+    const resultado = await obtenerHistorial(almacen, id).catch((error: unknown) => {
+      if (error instanceof ErrorDePrestamos) return error;
+      throw error;
+    });
+    if (resultado instanceof ErrorDePrestamos) return reply.code(resultado.codigo).send({ error: resultado.message });
+    return reply.code(200).send(resultado);
   });
   return Promise.resolve();
 };

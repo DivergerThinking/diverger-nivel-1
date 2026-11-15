@@ -91,6 +91,20 @@ export async function listarVencidos(
   return vencidos.sort((a, b) => a.devolucion.localeCompare(b.devolucion) || a.nombre.localeCompare(b.nombre));
 }
 
+/** Préstamos de un equipo, del más reciente al más antiguo. */
+export async function obtenerHistorial(
+  almacen: Almacen,
+  id: string,
+): Promise<components["schemas"]["EntradaHistorial"][]> {
+  if (!(await obtenerEquipo(almacen, id))) throw new ErrorDePrestamos(404, NO_EXISTE_EQUIPO);
+  const prestamos = (await almacen.listar<DocumentoPrestamo>(COLECCION_HISTORIAL)).filter((p) => p.equipoId === id);
+  // Se invierte antes de ordenar para que, con el mismo instante de inicio, el último registrado vaya primero.
+  return prestamos
+    .reverse()
+    .sort((a, b) => b.inicio.localeCompare(a.inicio))
+    .map(({ persona, devolucion, estado }) => ({ persona, devolucion, estado }));
+}
+
 /** Entrega un equipo reservado: pasa a prestado con la misma persona y fecha de devolución. */
 export async function entregarEquipo(almacen: Almacen, id: string): Promise<Equipo> {
   const equipo = await obtenerEquipo(almacen, id);
