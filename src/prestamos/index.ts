@@ -3,7 +3,7 @@ import type { FastifyPluginAsync } from "fastify";
 import "../../lib/auth.js";
 import type { OpcionesContexto } from "../../lib/datos.js";
 import { SOLO_IT, esCuentaDeIT } from "../equipos/index.js";
-import { ErrorDePrestamos, entregarEquipo, listarEquiposConEstado, solicitarEquipo } from "./prestamos.js";
+import { ErrorDePrestamos, entregarEquipo, listarEquiposConEstado, prestarEquipo, solicitarEquipo } from "./prestamos.js";
 
 /** Rutas del contrato spec/contextos/prestamos/api.openapi.json. */
 export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) => {
@@ -31,6 +31,17 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     });
     if (resultado instanceof ErrorDePrestamos) return reply.code(resultado.codigo).send({ error: resultado.message });
     return reply.code(200).send(resultado);
+  });
+  app.post("/api/equipos/:id/prestamo", async (request, reply) => {
+    if (!esCuentaDeIT(request.persona?.email ?? "")) return reply.code(403).send({ error: SOLO_IT });
+    const { id } = request.params as { id: string };
+    const cuerpo = request.body as { persona?: unknown; devolucion?: unknown } | null;
+    const resultado = await prestarEquipo(almacen, id, cuerpo?.persona, cuerpo?.devolucion).catch((error: unknown) => {
+      if (error instanceof ErrorDePrestamos) return error;
+      throw error;
+    });
+    if (resultado instanceof ErrorDePrestamos) return reply.code(resultado.codigo).send({ error: resultado.message });
+    return reply.code(201).send(resultado);
   });
   return Promise.resolve();
 };
