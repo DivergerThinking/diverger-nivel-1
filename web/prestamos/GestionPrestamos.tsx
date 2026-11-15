@@ -11,7 +11,8 @@ interface Equipo {
 
 /**
  * Lista los equipos (GET /api/equipos) y deja a IT entregar uno reservado (POST /api/equipos/{id}/entrega) o prestar
- * en el mostrador uno disponible (POST /api/equipos/{id}/prestamo).
+ * en el mostrador uno disponible (POST /api/equipos/{id}/prestamo) o apuntar la devolución de uno prestado
+ * (POST /api/equipos/{id}/devolucion).
  */
 export function GestionPrestamos({ sesion }: { sesion: Sesion }) {
   const [equipos, setEquipos] = useState<Equipo[]>([]);
@@ -47,6 +48,17 @@ export function GestionPrestamos({ sesion }: { sesion: Sesion }) {
       metodo: "POST",
       cuerpo: { persona, devolucion },
     })
+      .then(() => {
+        setVersion((actual) => actual + 1);
+      })
+      .catch((motivo: unknown) => {
+        setError(motivo instanceof Error ? motivo.message : String(motivo));
+      });
+  };
+
+  const devolver = (id: string) => {
+    setError(null);
+    api<Equipo>(sesion, `/api/equipos/${encodeURIComponent(id)}/devolucion`, { metodo: "POST" })
       .then(() => {
         setVersion((actual) => actual + 1);
       })
@@ -109,6 +121,16 @@ export function GestionPrestamos({ sesion }: { sesion: Sesion }) {
                 }}
               >
                 Entregar {equipo.nombre}
+              </button>
+            )}
+            {equipo.estado === "prestado" && (
+              <button
+                type="button"
+                onClick={() => {
+                  devolver(equipo.id);
+                }}
+              >
+                Apuntar devolución de {equipo.nombre}
               </button>
             )}
           </li>
