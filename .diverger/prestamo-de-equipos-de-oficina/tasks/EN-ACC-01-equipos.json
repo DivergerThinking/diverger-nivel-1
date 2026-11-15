@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "EN-ACC-01-equipos",
   "title": "Equipos: limitar a IT las operaciones de IT (EN-ACC-01)",
-  "status": "pending",
+  "status": "done",
   "story": "EN-ACC-01",
   "context": "equipos",
   "modules": ["src/equipos"],
