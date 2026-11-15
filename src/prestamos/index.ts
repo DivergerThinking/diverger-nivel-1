@@ -14,8 +14,10 @@ import {
   listarEquiposConEstado,
   NO_DISPONIBLE,
   NO_EXISTE_EQUIPO,
+  NO_PRESTADO,
   NO_RESERVADO,
   prestarEquipo,
+  registrarDevolucion,
   solicitarEquipo,
 } from "./prestamos.js";
 
@@ -62,6 +64,15 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
       return reply.code(200).send(equipo);
     }
     const cuerpo: Error = { error: resultado.tipo === "noExiste" ? NO_EXISTE_EQUIPO : NO_RESERVADO };
+    return reply.code(resultado.tipo === "noExiste" ? 404 : 409).send(cuerpo);
+  });
+  app.post<{ Params: { id: string } }>("/api/equipos/:id/devolucion", { preHandler: soloIT }, async (request, reply) => {
+    const resultado = await registrarDevolucion(almacen, request.params.id);
+    if (resultado.tipo === "devuelto") {
+      const equipo: Equipo = resultado.equipo;
+      return reply.code(200).send(equipo);
+    }
+    const cuerpo: Error = { error: resultado.tipo === "noExiste" ? NO_EXISTE_EQUIPO : NO_PRESTADO };
     return reply.code(resultado.tipo === "noExiste" ? 404 : 409).send(cuerpo);
   });
   app.post<{ Params: { id: string }; Body: PrestamoMostrador | null }>(
