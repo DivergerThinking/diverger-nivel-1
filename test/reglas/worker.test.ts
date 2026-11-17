@@ -117,7 +117,7 @@ describe("forma del workflow del worker", () => {
       token: "${{ steps.token-dev.outputs.token }}",
       path: ".diverger-dev",
       "persist-credentials": false,
-      "sparse-checkout": "plugins/diverger-dev\nplugins/diverger-quality\nplugins/diverger/agents\n",
+      "sparse-checkout": "plugins/diverger-dev\nplugins/diverger-quality\nplugins/diverger/agents\nplugins/diverger/server\n",
     });
     expect(indice("token-dev")).toBeLessThan(indice("Worker"));
     // El token de lectura solo lo usa la descarga: ningún otro paso lo cita.
@@ -135,12 +135,17 @@ describe("forma del workflow del worker", () => {
         .toEqual(["ANTHROPIC_API_KEY", "BASH_ENV", "CLAUDE_BIN", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "ENV", "TOPE_JOB"]);
       expect(paso(nombre).run).toMatch(/^bash "\$GITHUB_WORKSPACE\/\.github\/diverger\/worker-modelo\.sh" [123]$/);
     }
-    // La única excepción es «Quién lanzó la ejecución» (EN-OPS-07): el token del job, que solo lee el contenido y las
-    // ejecuciones, en el env de ese paso, que no pasa a los siguientes. id-token solo sirve para entrar en GCP.
+    // Las excepciones son «Quién lanzó la ejecución» (EN-OPS-07), con el token del job, que solo lee el contenido y las
+    // ejecuciones, y «Tarjeta a En curso» (HU-EJE-10), con el de la App que solo escribe en los Projects. Van en el env
+    // de su paso, que no pasa a los siguientes. id-token solo sirve para entrar en GCP.
     expect(JOB.permissions).toEqual({ contents: "read", actions: "read", "id-token": "write", statuses: "write" });
     for (const anterior of PASOS.slice(0, indice("Worker"))) {
       if (anterior.name === "Quién lanzó la ejecución") {
         expect(anterior.env).toEqual({ GH_TOKEN: "${{ github.token }}" });
+        continue;
+      }
+      if (anterior.name === "Tarjeta a En curso") {
+        expect(anterior.env?.GH_TOKEN).toBe("${{ steps.token-tarjeta.outputs.token }}");
         continue;
       }
       expect(JSON.stringify(anterior.env ?? {})).not.toMatch(/token|GH_TOKEN|GITHUB_TOKEN/i);
@@ -180,7 +185,7 @@ describe("forma del workflow del worker", () => {
       expect(JSON.stringify(auditor.env)).not.toMatch(/token|GH_TOKEN|GITHUB_TOKEN/i);
     }
     const auditor = readFileSync(SCRIPT_AUDITOR, "utf8");
-    expect(auditor).toContain("--agent diverger-quality:auditor-seguridad --plugin-dir \"$PLUGIN_QUALITY\"");
+    expect(auditor).toContain("--agent diverger-quality:auditor-seguridad --plugin-dir \"$PLUGIN_QUALITY\" --plugin-dir \"$PLUGIN_NUCLEO\"");
     expect(auditor).toContain('--permission-mode dontAsk --tools "Read,Glob,Grep"');
     expect(auditor).toContain("--setting-sources user --strict-mcp-config");
     expect(auditor).not.toMatch(/dangerously|bypassPermissions|acceptEdits|Bash|Edit|Write/);
@@ -234,7 +239,7 @@ describe("forma del workflow del worker", () => {
   it("el worker corre en dontAsk, sin Bash y escribiendo solo src/, web/ y app/contextos.ts", () => {
     expect(MODELO_SH).toMatch(/--permission-mode dontAsk/);
     expect(MODELO_SH).toMatch(/--setting-sources user --strict-mcp-config/);
-    expect(MODELO_SH).toMatch(/--plugin-dir "\$PLUGIN_DEV"/);
+    expect(MODELO_SH).toMatch(/--plugin-dir "\$PLUGIN_DEV" --plugin-dir "\$PLUGIN_NUCLEO"/);
     expect(MODELO_SH).not.toMatch(/dangerously|bypassPermissions|acceptEdits/);
     // Sin Bash ni herramientas de red: el modelo no ejecuta nada y solo sale a la API de Anthropic.
     const herramientas = /--tools "([^"]+)"/.exec(MODELO_SH)?.[1]?.split(",");
@@ -486,6 +491,31 @@ describe("forma del workflow del worker", () => {
     expect(paso("Parar el Collector").run).toContain("docker stop -t 30 otel");
     expect(indice("Parar el Collector")).toBeGreaterThan(indice("Rama y PR"));
     expect(indice("Parar el Collector")).toBeLessThan(indice("Eliminar el worktree"));
+  });
+
+  it("mueve la tarjeta a En curso antes del worker y a En revisión con la PR, sin parar el job (HU-EJE-10)", () => {
+    for (const [token, tarjeta, columna] of [
+      ["token-tarjeta", "Tarjeta a En curso", "in-progress"],
+      ["token-tarjeta-pr", "Tarjeta a En revisión", "in-review"],
+    ] as const) {
+      const t = paso(token);
+      expect(t.uses).toMatch(/^actions\/create-github-app-token@[0-9a-f]{40}$/);
+      expect(t["continue-on-error"]).toBe(true);
+      const permisos = Object.entries(t.with ?? {}).filter(([clave]) => clave.startsWith("permission-"));
+      expect(Object.fromEntries(permisos)).toEqual({ "permission-issues": "read", "permission-organization-projects": "write" });
+      expect(t.with?.repositories).toBe("${{ github.event.repository.name }}");
+      const p = paso(tarjeta);
+      expect(indice(tarjeta)).toBe(indice(token) + 1);
+      expect(p["continue-on-error"]).toBe(true);
+      expect(p.env?.GH_TOKEN).toBe(`\${{ steps.${token}.outputs.token }}`);
+      expect(p.run).toBe(`bash "$GITHUB_WORKSPACE/.github/diverger/worker-tarjeta.sh" ${columna}`);
+      // Cada token del Project solo lo usa su paso.
+      expect(TEXTO.split(`steps.${token}.outputs.token`)).toHaveLength(2);
+    }
+    expect(indice("Tarjeta a En curso")).toBeGreaterThan(indice("token-dev") + 1);
+    expect(indice("Tarjeta a En curso")).toBeLessThan(indice("Worker"));
+    expect(indice("token-tarjeta-pr")).toBe(indice("Rama y PR") + 1);
+    expect(paso("Resumen").run).toContain(`sed 's/^/- /' "$RUNNER_TEMP/tarjetas"`);
   });
 
   it("elimina el worktree y escribe el resumen siempre, al final", () => {
@@ -1006,6 +1036,8 @@ describe.skipIf(!HAY_JQ)("scripts del worker", () => {
     mkdirSync(worktree);
     escribir(dir, ".diverger-dev/plugins/diverger-dev/.claude-plugin/plugin.json", { name: "diverger-dev" });
     entorno.PLUGIN_DEV = join(dir, ".diverger-dev", "plugins", "diverger-dev");
+    escribir(dir, ".diverger-dev/plugin-revisor/.claude-plugin/plugin.json", { name: "diverger" });
+    entorno.PLUGIN_NUCLEO = join(dir, ".diverger-dev", "plugin-revisor");
     entorno.WORKTREE = worktree;
     entorno.MODELO = "claude-sonnet-5-5";
     entorno.CLAUDE_BIN = bin;
@@ -1023,6 +1055,8 @@ echo "{\\"subtype\\":\\"success\\",\\"is_error\\":false,\\"num_turns\\":3,\\"tot
     expect(args[1]).toBe("Usa la skill diverger-dev:implement para construir la tarea TA-001 de la iniciativa demo.");
     expect(args).not.toContain("--resume");
     expect(args[args.indexOf("--model") + 1]).toBe("claude-sonnet-5-5");
+    // diverger-dev depende del núcleo: sin él a su lado, Claude Code no la carga (harness#877).
+    expect(args.filter((a, i) => args[i - 1] === "--plugin-dir")).toEqual([entorno.PLUGIN_DEV, entorno.PLUGIN_NUCLEO]);
     expect(readFileSync(join(temp, "entorno-claude"), "utf8").trim()).toBe("clave=sk-prueba oidc=");
     expect(existsSync(join(temp, "salida-1.json"))).toBe(true);
   });
@@ -1158,6 +1192,8 @@ echo "{\\"subtype\\":\\"success\\",\\"is_error\\":false,\\"num_turns\\":3,\\"tot
     beforeEach(() => {
       escribir(dir, ".diverger-dev/plugins/diverger-quality/agents/auditor-seguridad.md", "---\nname: auditor-seguridad\n---\n");
       entorno.PLUGIN_QUALITY = join(dir, ".diverger-dev", "plugins", "diverger-quality");
+      escribir(dir, ".diverger-dev/plugin-revisor/.claude-plugin/plugin.json", { name: "diverger" });
+      entorno.PLUGIN_NUCLEO = join(dir, ".diverger-dev", "plugin-revisor");
       falso("claude", `printf '%s\\n' "$@" > "$RUNNER_TEMP/args-claude"
 cat "$RUNNER_TEMP/respuesta-claude"`);
       gitWt("init", "-q");
@@ -1180,6 +1216,9 @@ cat "$RUNNER_TEMP/respuesta-claude"`);
       expect(r.md).toContain("ana@example.com");
       const args = readFileSync(join(temp, "args-claude"), "utf8");
       expect(args).toContain("diverger-quality:auditor-seguridad");
+      // diverger-quality depende del núcleo: sin él a su lado, Claude Code no la carga (harness#877).
+      const lineas = args.split("\n");
+      expect(lineas.filter((a, i) => lineas[i - 1] === "--plugin-dir")).toEqual([entorno.PLUGIN_QUALITY, entorno.PLUGIN_NUCLEO]);
       // El diff del intento llega al Auditor, y el índice queda como estaba.
       expect(readFileSync(join(temp, "auditoria-1", "cambios.diff"), "utf8")).toContain("src/prestamos/rutas.ts");
       expect(spawnSync("git", ["status", "--porcelain"], { cwd: worktree, encoding: "utf8" }).stdout).toBe("?? src/prestamos/rutas.ts\n");
@@ -1214,6 +1253,15 @@ cat "$RUNNER_TEMP/respuesta-claude"`);
       expect(r.veredicto).toBe("ninguno");
       expect(r.motivoAuditor).toContain("No queda presupuesto para el Auditor de seguridad");
       expect(r.salidas).toContain("coste=0\n");
+      expect(existsSync(join(temp, "args-claude"))).toBe(false);
+    });
+
+    it("sin el núcleo junto a diverger-quality no lanza el Auditor y la tarea no pasa (harness#877)", () => {
+      responde(JSON.stringify(BLOQUEO));
+      const r = auditar({ PLUGIN_NUCLEO: join(dir, "no-existe") });
+      expect(r.codigo).toBe(2);
+      expect(r.veredicto).toBe("ninguno");
+      expect(r.motivoAuditor).toBe(`No está el núcleo en ${join(dir, "no-existe")}: diverger-quality depende de él y Claude Code no la cargaría`);
       expect(existsSync(join(temp, "args-claude"))).toBe(false);
     });
 
@@ -1572,10 +1620,54 @@ cat "$RUNNER_TEMP/respuesta-claude"`);
     expect(r.motivo).toBe("El worker se ha parado: BLOQUEADA: hace falta cambiar spec/");
   });
 
+  // El worker de diverger-nivel-1#168 corrigió el lint y terminó con «BLOQUEADA: no aplica, la tarea sigue construida»:
+  // usó el marcador para decir que no estaba bloqueado, y la tarea se quedó bloqueada sin pasar las comprobaciones.
+  it.each([
+    "BLOQUEADA: no aplica, la tarea sigue construida; falta confirmar que el resto de `npm run check` pasa.",
+    "BLOQUEADA: No aplica.",
+    "BLOQUEADA: no procede",
+    "BLOQUEADA: no",
+    "BLOQUEADA: no.",
+    "BLOQUEADA: ninguno",
+    "BLOQUEADA: nada; la tarea queda construida",
+    "BLOQUEADA: N/A",
+    "BLOCKED: not applicable, the task is built",
+    "BLOCKED: none",
+  ])("un marcador que niega el bloqueo no para el intento, que sigue a las comprobaciones: «%s» (harness#846)", (ultima) => {
+    writeFileSync(join(temp, "salida-1.json"), JSON.stringify({ session_id: "s-1" }));
+    writeFileSync(join(temp, "comprobaciones-1.log"), "web/prestamos/Mostrador.tsx: 'FormEvent' is deprecated\n");
+    const r = script(SCRIPT_MODELO, "2", { RESULTADO: `He corregido el lint.\\nFALLO: el lint rechazó FormEvent\\n${ultima}` });
+    expect(r.motivo).toBe("");
+    expect(r.codigo).toBe(0);
+    expect(r.salida).toContain("::notice::El worker ha escrito el marcador de bloqueo para decir que no está bloqueado");
+    // La línea FALLO de antes de la última se guarda igual.
+    expect(readFileSync(join(temp, "fallos"), "utf8")).toBe("FALLO: el lint rechazó FormEvent\n");
+  });
+
+  it.each([
+    "BLOQUEADA: no existe src/equipos/index.ts y la tarea lo importa",
+    "BLOQUEADA: no puedo construir la pantalla sin cambiar web/App.tsx",
+    "BLOQUEADA: nada exporta listarEquipos en src/equipos",
+    "BLOQUEADA: ninguna tarea construye el contexto equipos",
+    "BLOCKED: no route in the contract matches the story",
+    "BLOCKED: nothing exports listarEquipos",
+  ])("un bloqueo de verdad que empieza por una negación sigue parando el intento: «%s» (harness#846)", (ultima) => {
+    const r = script(SCRIPT_MODELO, "1", { RESULTADO: ultima });
+    expect(r.codigo).toBe(1);
+    expect(r.motivo).toBe(`El worker se ha parado: ${ultima}`);
+  });
+
   it("sin el plugin descargado no lanza el modelo", () => {
     const r = script(SCRIPT_MODELO, "1", { PLUGIN_DEV: join(dir, "no-existe") });
     expect(r.codigo).toBe(1);
     expect(r.motivo).toBe(`No está el plugin diverger-dev en ${join(dir, "no-existe")}`);
+    expect(existsSync(join(temp, "args-claude"))).toBe(false);
+  });
+
+  it("sin el núcleo junto a diverger-dev no lanza el modelo, que no tendría la skill (harness#877)", () => {
+    const r = script(SCRIPT_MODELO, "1", { PLUGIN_NUCLEO: join(dir, "no-existe") });
+    expect(r.codigo).toBe(1);
+    expect(r.motivo).toBe(`No está el núcleo en ${join(dir, "no-existe")}: diverger-dev depende de él y Claude Code no la cargaría`);
     expect(existsSync(join(temp, "args-claude"))).toBe(false);
   });
 });
