@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "HU-SOL-04-prestamos",
   "title": "Préstamos: pedir un equipo con una fecha de devolución válida (HU-SOL-04)",
-  "status": "pending",
+  "status": "done",
   "story": "HU-SOL-04",
   "context": "prestamos",
   "modules": ["src/prestamos", "web/prestamos"],

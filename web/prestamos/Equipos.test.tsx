@@ -89,4 +89,21 @@ describe("pantalla Equipos", () => {
     fireEvent.click(within(formulario).getByRole("button", { name: "Pedir" }));
     expect((await screen.findByRole("alert")).textContent).toBe("El equipo no está disponible");
   });
+
+  it.each([
+    ["", "Falta la fecha de devolución"],
+    ["2026-02-30", "La fecha de devolución no es válida"],
+    ["2026-11-23", "La fecha de devolución ya ha pasado"],
+  ])("enseña el mensaje de la API cuando la devolución «%s» no vale", async (devolucion, mensaje) => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(respuesta([{ id: "e1", nombre: "Portátil 07", estado: "disponible" }]))
+      .mockResolvedValueOnce(respuesta({ error: mensaje }, 400));
+    vi.stubGlobal("fetch", fetch);
+    render(<Equipos sesion={SESION} />);
+    const formulario = await screen.findByRole("form", { name: "Pedir Portátil 07" });
+    fireEvent.change(within(formulario).getByLabelText("Fecha de devolución"), { target: { value: devolucion } });
+    fireEvent.click(within(formulario).getByRole("button", { name: "Pedir" }));
+    expect((await screen.findByRole("alert")).textContent).toBe(mensaje);
+  });
 });
