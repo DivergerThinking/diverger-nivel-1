@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { Sesion } from "../pantallas.js";
 import { Equipos } from "./Equipos.js";
 
@@ -39,5 +39,54 @@ describe("pantalla Equipos", () => {
     render(<Equipos sesion={SESION} />);
     expect((await screen.findByRole("alert")).textContent).toBe("Inicia sesión con Google.");
     expect(screen.queryByLabelText("Lista de equipos")).toBeNull();
+  });
+
+  it("pide un equipo disponible con la fecha y el token, y recarga la lista", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(respuesta([{ id: "e1", nombre: "Portátil 07", estado: "disponible" }]))
+      .mockResolvedValueOnce(
+        respuesta({ id: "e1", nombre: "Portátil 07", estado: "reservado", persona: "ana.perez@empresa.com", devolucion: "2026-12-15" }, 201),
+      )
+      .mockResolvedValueOnce(
+        respuesta([{ id: "e1", nombre: "Portátil 07", estado: "reservado", persona: "ana.perez@empresa.com", devolucion: "2026-12-15" }]),
+      );
+    vi.stubGlobal("fetch", fetch);
+    render(<Equipos sesion={SESION} />);
+    const formulario = await screen.findByRole("form", { name: "Pedir Portátil 07" });
+    fireEvent.change(within(formulario).getByLabelText("Fecha de devolución"), { target: { value: "2026-12-15" } });
+    fireEvent.click(within(formulario).getByRole("button", { name: "Pedir" }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("Lista de equipos").textContent).toContain("Portátil 07: reservado");
+    });
+    expect(fetch).toHaveBeenCalledWith("/api/equipos/e1/solicitud", {
+      method: "POST",
+      headers: { authorization: "Bearer token-de-ana", "content-type": "application/json" },
+      body: JSON.stringify({ devolucion: "2026-12-15" }),
+    });
+    expect(screen.queryByRole("form", { name: "Pedir Portátil 07" })).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("no deja pedir un equipo reservado o prestado", async () => {
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve(respuesta([{ id: "e2", nombre: "Monitor 03", estado: "reservado", persona: "luis.garcia@empresa.com", devolucion: "2026-12-15" }])),
+    );
+    render(<Equipos sesion={SESION} />);
+    await screen.findByLabelText("Lista de equipos");
+    expect(screen.queryByRole("button", { name: "Pedir" })).toBeNull();
+  });
+
+  it("enseña tal cual el mensaje de la API cuando pedir falla", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(respuesta([{ id: "e1", nombre: "Portátil 07", estado: "disponible" }]))
+      .mockResolvedValueOnce(respuesta({ error: "El equipo no está disponible" }, 409));
+    vi.stubGlobal("fetch", fetch);
+    render(<Equipos sesion={SESION} />);
+    const formulario = await screen.findByRole("form", { name: "Pedir Portátil 07" });
+    fireEvent.change(within(formulario).getByLabelText("Fecha de devolución"), { target: { value: "2026-12-15" } });
+    fireEvent.click(within(formulario).getByRole("button", { name: "Pedir" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("El equipo no está disponible");
   });
 });

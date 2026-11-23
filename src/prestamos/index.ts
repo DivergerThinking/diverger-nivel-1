@@ -2,7 +2,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import "../../lib/auth.js";
 import type { OpcionesContexto } from "../../lib/datos.js";
-import { esCuentaDeIT, esOperacionDeIT, listarEquipos, SOLO_IT, type Equipo } from "./prestamos.js";
+import { esCuentaDeIT, esOperacionDeIT, listarEquipos, SOLO_IT, solicitarEquipo, type Equipo } from "./prestamos.js";
 
 export type { Equipo } from "./prestamos.js";
 
@@ -18,6 +18,15 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
   app.get("/api/equipos", async () => {
     const equipos: Equipo[] = await listarEquipos(almacen);
     return equipos;
+  });
+
+  app.post<{ Params: { id: string } }>("/api/equipos/:id/solicitud", async (request, reply) => {
+    const persona = request.persona?.email;
+    if (!persona) return reply.code(401).send({ error: "Inicia sesión con Google." });
+    const cuerpo = request.body as { devolucion?: unknown } | null | undefined;
+    const resultado = await solicitarEquipo(almacen, request.params.id, persona, cuerpo?.devolucion);
+    if (!resultado.ok) return reply.code(resultado.status).send({ error: resultado.error });
+    return reply.code(201).send(resultado.equipo);
   });
   return Promise.resolve();
 };
