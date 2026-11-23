@@ -202,6 +202,57 @@ describe("POST /api/equipos/:id/solicitud", () => {
     expect(respuesta.statusCode).toBe(400);
     expect(respuesta.json()).toEqual({ error: "La fecha de devolución ya ha pasado" });
   });
+
+  it("de dos peticiones a la vez sobre el mismo equipo una recibe 201 y la otra 409, y queda a nombre de una sola persona", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e1", { id: "e1", nombre: "Portátil 07" });
+    const cuerpo = { devolucion: "2026-12-15" };
+    const respuestas = await Promise.all([
+      pedir(app, "e1", cuerpo, "ana.perez@empresa.com"),
+      pedir(app, "e1", cuerpo, "luis.garcia@empresa.com"),
+    ]);
+    expect(respuestas.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+    const perdedora = respuestas.find((r) => r.statusCode === 409);
+    expect(perdedora?.json()).toEqual({ error: "El equipo no está disponible" });
+    const ganadora = respuestas.find((r) => r.statusCode === 201);
+    const equipos = (await ver(app)).json<{ estado: string; persona?: string }[]>();
+    expect(equipos).toHaveLength(1);
+    expect(equipos[0]).toMatchObject({ estado: "reservado", persona: (ganadora?.json() as { persona: string }).persona });
+    expect(await almacen.listar("prestamos_prestamos")).toHaveLength(1);
+  });
+
+  it("de una petición y un préstamo en el mostrador a la vez solo una operación sale bien", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e2", { id: "e2", nombre: "Monitor 03" });
+    const [pedido, prestado] = await Promise.all([
+      pedir(app, "e2", { devolucion: "2026-12-15" }, "ana.perez@empresa.com"),
+      app.inject({
+        method: "POST",
+        url: "/api/equipos/e2/prestamo",
+        headers: { "x-correo": "it@empresa.com" },
+        payload: { persona: "luis.garcia@empresa.com", devolucion: "2026-12-15" },
+      }),
+    ]);
+    expect([pedido.statusCode, prestado.statusCode].sort()).toEqual([201, 409]);
+    const perdedora = pedido.statusCode === 409 ? pedido : prestado;
+    expect(perdedora.json()).toEqual({ error: "El equipo no está disponible" });
+    expect(await almacen.listar("prestamos_activos")).toHaveLength(1);
+    expect(await almacen.listar("prestamos_prestamos")).toHaveLength(1);
+  });
+
+  it("de 20 peticiones simultáneas de 20 personas exactamente una recibe 201 y las otras 19 reciben 409", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e3", { id: "e3", nombre: "Proyector 01" });
+    const respuestas = await Promise.all(
+      Array.from({ length: 20 }, (_, i) => pedir(app, "e3", { devolucion: "2026-12-15" }, `empleado${i}@empresa.com`)),
+    );
+    expect(respuestas.filter((r) => r.statusCode === 201)).toHaveLength(1);
+    const rechazadas = respuestas.filter((r) => r.statusCode === 409);
+    expect(rechazadas).toHaveLength(19);
+    for (const rechazada of rechazadas) expect(rechazada.json()).toEqual({ error: "El equipo no está disponible" });
+    expect(await almacen.listar("prestamos_activos")).toHaveLength(1);
+    expect(await almacen.listar("prestamos_prestamos")).toHaveLength(1);
+  });
 });
 
 describe("POST /api/equipos/:id/entrega", () => {
