@@ -2,7 +2,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import "../../lib/auth.js";
 import type { OpcionesContexto } from "../../lib/datos.js";
-import { devolverEquipo, entregarEquipo, esCuentaDeIT, esOperacionDeIT, listarEquipos, listarVencidos, prestarEquipo, SOLO_IT, solicitarEquipo, type Equipo, type Vencido } from "./prestamos.js";
+import { devolverEquipo, entregarEquipo, esCuentaDeIT, esOperacionDeIT, listarEquipos, listarVencidos, obtenerHistorial, prestarEquipo, SOLO_IT, solicitarEquipo, type Equipo, type Vencido } from "./prestamos.js";
 
 export type { Equipo } from "./prestamos.js";
 
@@ -51,6 +51,11 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
   app.get("/api/prestamos/vencidos", async () => {
     const vencidos: Vencido[] = await listarVencidos(almacen);
     return vencidos;
+  });
+  app.get<{ Params: { id: string } }>("/api/equipos/:id/historial", async (request, reply) => {
+    const resultado = await obtenerHistorial(almacen, request.params.id);
+    if (!resultado.ok) return reply.code(resultado.status).send({ error: resultado.error });
+    return resultado.historial;
   });
   return Promise.resolve();
 };
