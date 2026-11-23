@@ -58,6 +58,7 @@ export const PRESTAMOS = "prestamos_prestamos";
 
 export const NO_EXISTE = "No existe el equipo";
 export const NO_DISPONIBLE = "El equipo no está disponible";
+export const NO_RESERVADO = "El equipo no está reservado";
 export const FALTA_DEVOLUCION = "Falta la fecha de devolución";
 export const DEVOLUCION_NO_VALIDA = "La fecha de devolución no es válida";
 export const DEVOLUCION_PASADA = "La fecha de devolución ya ha pasado";
@@ -99,6 +100,20 @@ export async function solicitarEquipo(
     tx.guardar(ACTIVOS, id, nuevo);
     tx.guardar(PRESTAMOS, prestamo.id, prestamo);
     return { ok: true, equipo: { id, nombre: equipo.nombre, estado: "reservado", persona, devolucion } };
+  });
+}
+
+/** Entrega un equipo reservado: pasa a prestado, con la misma persona y devolución de la solicitud. */
+export async function entregarEquipo(almacen: Almacen, id: string): Promise<ResultadoSolicitud> {
+  const equipo = await obtenerEquipo(almacen, id);
+  if (!equipo) return { ok: false, status: 404, error: NO_EXISTE };
+  return almacen.transaccion<ResultadoSolicitud>(async (tx) => {
+    const activo = await tx.obtener<PrestamoActivo>(ACTIVOS, id);
+    if (activo?.estado !== "reservado") return { ok: false, status: 409, error: NO_RESERVADO };
+    const prestamo = await tx.obtener<Prestamo>(PRESTAMOS, activo.prestamo);
+    tx.guardar(ACTIVOS, id, { ...activo, estado: "prestado" } satisfies PrestamoActivo);
+    if (prestamo) tx.guardar(PRESTAMOS, prestamo.id, { ...prestamo, estado: "prestado" } satisfies Prestamo);
+    return { ok: true, equipo: { id, nombre: equipo.nombre, estado: "prestado", persona: activo.persona, devolucion: activo.devolucion } };
   });
 }
 
