@@ -504,11 +504,11 @@ describe("GET /api/equipos/{id}/historial (HU-INV-02)", () => {
       payload: { persona: "otra@empresa.com", devolucion: "2026-11-11" },
     });
     await app.inject({ method: "POST", url: `/api/equipos/${id}/devolucion`, headers: con("it") });
-    await solicitar("ana", id, { devolucion: "2026-11-20" });
+    await solicitar("ana", id, { devolucion: "2099-11-20" });
     const respuesta = await historial("it", id);
     expect(respuesta.statusCode).toBe(200);
     expect(respuesta.json()).toEqual([
-      { persona: "ana.perez@empresa.com", devolucion: "2026-11-20", estado: "reservado" },
+      { persona: "ana.perez@empresa.com", devolucion: "2099-11-20", estado: "reservado" },
       { persona: "luis.gomez@empresa.com", devolucion: "2026-11-10", estado: "devuelto" },
     ]);
   });
