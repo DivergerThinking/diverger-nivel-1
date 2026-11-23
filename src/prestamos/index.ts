@@ -2,7 +2,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import "../../lib/auth.js";
 import type { OpcionesContexto } from "../../lib/datos.js";
-import { esCuentaDeIT, esOperacionDeIT, listarEquipos, SOLO_IT, solicitarEquipo, type Equipo } from "./prestamos.js";
+import { entregarEquipo, esCuentaDeIT, esOperacionDeIT, listarEquipos, SOLO_IT, solicitarEquipo, type Equipo } from "./prestamos.js";
 
 export type { Equipo } from "./prestamos.js";
 
@@ -27,6 +27,12 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     const resultado = await solicitarEquipo(almacen, request.params.id, persona, cuerpo?.devolucion);
     if (!resultado.ok) return reply.code(resultado.status).send({ error: resultado.error });
     return reply.code(201).send(resultado.equipo);
+  });
+
+  app.post<{ Params: { id: string } }>("/api/equipos/:id/entrega", async (request, reply) => {
+    const resultado = await entregarEquipo(almacen, request.params.id);
+    if (!resultado.ok) return reply.code(resultado.status).send({ error: resultado.error });
+    return reply.code(200).send(resultado.equipo);
   });
   return Promise.resolve();
 };

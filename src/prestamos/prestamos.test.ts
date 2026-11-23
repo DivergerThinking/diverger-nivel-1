@@ -204,6 +204,89 @@ describe("POST /api/equipos/:id/solicitud", () => {
   });
 });
 
+describe("POST /api/equipos/:id/entrega", () => {
+  const entregar = (app: Awaited<ReturnType<typeof servidor>>["app"], id: string, correo = "it@empresa.com") =>
+    app.inject({ method: "POST", url: `/api/equipos/${id}/entrega`, headers: { "x-correo": correo } });
+
+  it("pasa el equipo reservado a prestado con la persona y la devolución de la solicitud", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e1", { id: "e1", nombre: "Portátil 07" });
+    await almacen.guardar("prestamos_prestamos", "p1", {
+      id: "p1",
+      equipo: "e1",
+      persona: "ana.perez@empresa.com",
+      devolucion: "2026-12-15",
+      estado: "reservado",
+      creado: "2026-11-23T10:00:00.000Z",
+    });
+    await almacen.guardar("prestamos_activos", "e1", {
+      id: "e1",
+      prestamo: "p1",
+      persona: "ana.perez@empresa.com",
+      devolucion: "2026-12-15",
+      estado: "reservado",
+    });
+    const respuesta = await entregar(app, "e1");
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual({
+      id: "e1",
+      nombre: "Portátil 07",
+      estado: "prestado",
+      persona: "ana.perez@empresa.com",
+      devolucion: "2026-12-15",
+    });
+    expect((await ver(app)).json()).toEqual([respuesta.json()]);
+    expect(await almacen.obtener("prestamos_prestamos", "p1")).toMatchObject({ estado: "prestado" });
+  });
+
+  it("responde 409 si el equipo está disponible y sigue disponible", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e2", { id: "e2", nombre: "Monitor 03" });
+    const respuesta = await entregar(app, "e2");
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está reservado" });
+    expect((await ver(app)).json()).toEqual([{ id: "e2", nombre: "Monitor 03", estado: "disponible" }]);
+  });
+
+  it("responde 409 si el equipo ya está prestado", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e2", { id: "e2", nombre: "Monitor 03" });
+    await almacen.guardar("prestamos_activos", "e2", {
+      id: "e2",
+      prestamo: "p2",
+      persona: "luis.garcia@empresa.com",
+      devolucion: "2026-12-20",
+      estado: "prestado",
+    });
+    const respuesta = await entregar(app, "e2");
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está reservado" });
+  });
+
+  it("responde 404 si el equipo no existe", async () => {
+    const { app } = await servidor();
+    const respuesta = await entregar(app, "no-existe");
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("responde 403 a quien no es de IT y no entrega el equipo", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e1", { id: "e1", nombre: "Portátil 07" });
+    await almacen.guardar("prestamos_activos", "e1", {
+      id: "e1",
+      prestamo: "p1",
+      persona: "ana.perez@empresa.com",
+      devolucion: "2026-12-15",
+      estado: "reservado",
+    });
+    const respuesta = await entregar(app, "e1", "ana.perez@empresa.com");
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+    expect(await almacen.obtener("prestamos_activos", "e1")).toMatchObject({ estado: "reservado" });
+  });
+});
+
 describe("hoyEnMadrid", () => {
   it("da el día en Madrid", () => {
     expect(hoyEnMadrid(new Date("2026-11-23T23:30:00Z"))).toBe("2026-11-24");

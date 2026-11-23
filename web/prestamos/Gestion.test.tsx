@@ -44,6 +44,24 @@ describe("pantalla Gestión de préstamos", () => {
     });
   });
 
+  it("enseña tal cual el 409 de la API si el equipo no está reservado", async () => {
+    vi.stubGlobal("fetch", (ruta: string) =>
+      Promise.resolve(ruta === "/api/equipos" ? respuesta(EQUIPOS) : respuesta({ error: "El equipo no está reservado" }, 409)),
+    );
+    render(<Gestion sesion={SESION} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Entregar Monitor 03" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("El equipo no está reservado");
+  });
+
+  it("enseña tal cual el 404 de la API si el equipo no existe", async () => {
+    vi.stubGlobal("fetch", (ruta: string) =>
+      Promise.resolve(ruta === "/api/equipos" ? respuesta(EQUIPOS) : respuesta({ error: "No existe el equipo" }, 404)),
+    );
+    render(<Gestion sesion={SESION} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Entregar Monitor 03" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("No existe el equipo");
+  });
+
   it("apunta la devolución de un equipo prestado", async () => {
     const fetch = vi.fn((ruta: string) => Promise.resolve(respuesta(ruta === "/api/equipos" ? EQUIPOS : EQUIPOS[0])));
     vi.stubGlobal("fetch", fetch);
