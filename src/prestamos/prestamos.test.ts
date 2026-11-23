@@ -287,6 +287,134 @@ describe("POST /api/equipos/:id/entrega", () => {
   });
 });
 
+describe("POST /api/equipos/:id/prestamo", () => {
+  const prestar = (app: Awaited<ReturnType<typeof servidor>>["app"], id: string, cuerpo: unknown, correo = "it@empresa.com") =>
+    app.inject({ method: "POST", url: `/api/equipos/${id}/prestamo`, headers: { "x-correo": correo }, payload: cuerpo as object });
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-23T10:00:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("presta el equipo disponible y responde 201", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e1", { id: "e1", nombre: "Proyector 01" });
+    const respuesta = await prestar(app, "e1", { persona: "ana.perez@empresa.com", devolucion: "2026-11-30" });
+    expect(respuesta.statusCode).toBe(201);
+    expect(respuesta.json()).toEqual({
+      id: "e1",
+      nombre: "Proyector 01",
+      estado: "prestado",
+      persona: "ana.perez@empresa.com",
+      devolucion: "2026-11-30",
+    });
+    expect((await ver(app)).json()).toEqual([respuesta.json()]);
+    const prestamos = await almacen.listar<{ equipo: string; estado: string; persona: string }>("prestamos_prestamos");
+    expect(prestamos).toHaveLength(1);
+    expect(prestamos[0]).toMatchObject({ equipo: "e1", estado: "prestado", persona: "ana.perez@empresa.com" });
+  });
+
+  it("acepta una devolución anterior a hoy", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e3", { id: "e3", nombre: "Monitor 03" });
+    const respuesta = await prestar(app, "e3", { persona: "luis.garcia@empresa.com", devolucion: "2026-11-10" });
+    expect(respuesta.statusCode).toBe(201);
+    expect(respuesta.json()).toMatchObject({ nombre: "Monitor 03", estado: "prestado", devolucion: "2026-11-10" });
+  });
+
+  it("responde 400 y deja el equipo disponible si falta la persona o la devolución", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e1", { id: "e1", nombre: "Proyector 01" });
+    const casos: unknown[] = [
+      { devolucion: "2026-11-30" },
+      { persona: "", devolucion: "2026-11-30" },
+      { persona: "   ", devolucion: "2026-11-30" },
+      { persona: "ana.perez@empresa.com" },
+      { persona: "ana.perez@empresa.com", devolucion: "" },
+      {},
+    ];
+    for (const cuerpo of casos) {
+      const respuesta = await prestar(app, "e1", cuerpo);
+      expect(respuesta.statusCode).toBe(400);
+      expect(respuesta.json()).toEqual({ error: "Faltan la persona o la fecha de devolución" });
+    }
+    expect(await almacen.listar("prestamos_activos")).toHaveLength(0);
+    expect(await almacen.listar("prestamos_prestamos")).toHaveLength(0);
+  });
+
+  it("responde 400 y deja el equipo disponible si la fecha no es real", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e1", { id: "e1", nombre: "Proyector 01" });
+    for (const devolucion of ["2026-02-30", "30/11/2026"]) {
+      const respuesta = await prestar(app, "e1", { persona: "ana.perez@empresa.com", devolucion });
+      expect(respuesta.statusCode).toBe(400);
+      expect(respuesta.json()).toEqual({ error: "La fecha de devolución no es válida" });
+    }
+    expect(await almacen.listar("prestamos_activos")).toHaveLength(0);
+  });
+
+  it("responde 409 si el equipo está reservado y deja la reserva igual", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e7", { id: "e7", nombre: "Portátil 07" });
+    await almacen.guardar("prestamos_activos", "e7", {
+      id: "e7",
+      prestamo: "p7",
+      persona: "luis.garcia@empresa.com",
+      devolucion: "2026-12-15",
+      estado: "reservado",
+    });
+    const respuesta = await prestar(app, "e7", { persona: "ana.perez@empresa.com", devolucion: "2026-11-30" });
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está disponible" });
+    expect(await almacen.obtener("prestamos_activos", "e7")).toMatchObject({ persona: "luis.garcia@empresa.com", estado: "reservado" });
+    expect(await almacen.listar("prestamos_prestamos")).toHaveLength(0);
+  });
+
+  it("responde 409 si el equipo ya está prestado", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e2", { id: "e2", nombre: "Monitor 03" });
+    await almacen.guardar("prestamos_activos", "e2", {
+      id: "e2",
+      prestamo: "p2",
+      persona: "luis.garcia@empresa.com",
+      devolucion: "2026-12-20",
+      estado: "prestado",
+    });
+    const respuesta = await prestar(app, "e2", { persona: "ana.perez@empresa.com", devolucion: "2026-11-30" });
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está disponible" });
+  });
+
+  it("responde 404 si el equipo no existe", async () => {
+    const { app } = await servidor();
+    const respuesta = await prestar(app, "no-existe", { persona: "ana.perez@empresa.com", devolucion: "2026-11-30" });
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("responde 403 a quien no es de IT y no presta el equipo", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e1", { id: "e1", nombre: "Proyector 01" });
+    const respuesta = await prestar(app, "e1", { persona: "ana.perez@empresa.com", devolucion: "2026-11-30" }, "ana.perez@empresa.com");
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+    expect(await almacen.listar("prestamos_activos")).toHaveLength(0);
+  });
+
+  it("de dos préstamos a la vez sobre el mismo equipo solo uno sale bien", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e1", { id: "e1", nombre: "Proyector 01" });
+    const cuerpo = { persona: "ana.perez@empresa.com", devolucion: "2026-11-30" };
+    const respuestas = await Promise.all([prestar(app, "e1", cuerpo), prestar(app, "e1", cuerpo)]);
+    expect(respuestas.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+    expect(await almacen.listar("prestamos_prestamos")).toHaveLength(1);
+  });
+});
+
 describe("hoyEnMadrid", () => {
   it("da el día en Madrid", () => {
     expect(hoyEnMadrid(new Date("2026-11-23T23:30:00Z"))).toBe("2026-11-24");

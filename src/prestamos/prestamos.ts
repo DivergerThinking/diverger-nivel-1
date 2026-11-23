@@ -60,6 +60,7 @@ export const NO_EXISTE = "No existe el equipo";
 export const NO_DISPONIBLE = "El equipo no está disponible";
 export const NO_RESERVADO = "El equipo no está reservado";
 export const FALTA_DEVOLUCION = "Falta la fecha de devolución";
+export const FALTAN_PERSONA_O_DEVOLUCION = "Faltan la persona o la fecha de devolución";
 export const DEVOLUCION_NO_VALIDA = "La fecha de devolución no es válida";
 export const DEVOLUCION_PASADA = "La fecha de devolución ya ha pasado";
 
@@ -114,6 +115,32 @@ export async function entregarEquipo(almacen: Almacen, id: string): Promise<Resu
     tx.guardar(ACTIVOS, id, { ...activo, estado: "prestado" } satisfies PrestamoActivo);
     if (prestamo) tx.guardar(PRESTAMOS, prestamo.id, { ...prestamo, estado: "prestado" } satisfies Prestamo);
     return { ok: true, equipo: { id, nombre: equipo.nombre, estado: "prestado", persona: activo.persona, devolucion: activo.devolucion } };
+  });
+}
+
+/** Presta un equipo disponible en el mostrador a la persona indicada; la devolución puede ser anterior a hoy. */
+export async function prestarEquipo(
+  almacen: Almacen,
+  id: string,
+  persona: unknown,
+  devolucion: unknown,
+  ahora: Date = new Date(),
+): Promise<ResultadoSolicitud> {
+  if (typeof persona !== "string" || persona.trim() === "" || typeof devolucion !== "string" || devolucion.trim() === "") {
+    return { ok: false, status: 400, error: FALTAN_PERSONA_O_DEVOLUCION };
+  }
+  if (!esFechaReal(devolucion)) return { ok: false, status: 400, error: DEVOLUCION_NO_VALIDA };
+  const quien = persona.trim();
+  const equipo = await obtenerEquipo(almacen, id);
+  if (!equipo) return { ok: false, status: 404, error: NO_EXISTE };
+  return almacen.transaccion<ResultadoSolicitud>(async (tx) => {
+    const activo = await tx.obtener<PrestamoActivo>(ACTIVOS, id);
+    if (activo) return { ok: false, status: 409, error: NO_DISPONIBLE };
+    const prestamo: Prestamo = { id: randomUUID(), equipo: id, persona: quien, devolucion, estado: "prestado", creado: ahora.toISOString() };
+    const nuevo: PrestamoActivo = { id, prestamo: prestamo.id, persona: quien, devolucion, estado: "prestado" };
+    tx.guardar(ACTIVOS, id, nuevo);
+    tx.guardar(PRESTAMOS, prestamo.id, prestamo);
+    return { ok: true, equipo: { id, nombre: equipo.nombre, estado: "prestado", persona: quien, devolucion } };
   });
 }
 

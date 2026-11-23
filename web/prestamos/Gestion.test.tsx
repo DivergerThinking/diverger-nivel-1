@@ -92,6 +92,21 @@ describe("pantalla Gestión de préstamos", () => {
     });
   });
 
+  it("enseña tal cual los 400 y el 409 de la API al prestar en el mostrador", async () => {
+    for (const [status, error] of [
+      [400, "Faltan la persona o la fecha de devolución"],
+      [400, "La fecha de devolución no es válida"],
+      [409, "El equipo no está disponible"],
+    ] as const) {
+      vi.stubGlobal("fetch", (ruta: string) => Promise.resolve(ruta === "/api/equipos" ? respuesta(EQUIPOS) : respuesta({ error }, status)));
+      render(<Gestion sesion={SESION} />);
+      await screen.findByLabelText("Equipos para gestionar");
+      fireEvent.click(screen.getByRole("button", { name: "Prestar" }));
+      expect((await screen.findByRole("alert")).textContent).toBe(error);
+      cleanup();
+    }
+  });
+
   it("enseña tal cual el 403 de la API a quien no es de IT", async () => {
     vi.stubGlobal("fetch", (ruta: string) =>
       Promise.resolve(ruta === "/api/equipos" ? respuesta(EQUIPOS) : respuesta({ error: "Solo IT puede hacer esto." }, 403)),
