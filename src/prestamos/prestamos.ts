@@ -59,6 +59,7 @@ export const PRESTAMOS = "prestamos_prestamos";
 export const NO_EXISTE = "No existe el equipo";
 export const NO_DISPONIBLE = "El equipo no está disponible";
 export const NO_RESERVADO = "El equipo no está reservado";
+export const NO_PRESTADO = "El equipo no está prestado";
 export const FALTA_DEVOLUCION = "Falta la fecha de devolución";
 export const FALTAN_PERSONA_O_DEVOLUCION = "Faltan la persona o la fecha de devolución";
 export const DEVOLUCION_NO_VALIDA = "La fecha de devolución no es válida";
@@ -115,6 +116,20 @@ export async function entregarEquipo(almacen: Almacen, id: string): Promise<Resu
     tx.guardar(ACTIVOS, id, { ...activo, estado: "prestado" } satisfies PrestamoActivo);
     if (prestamo) tx.guardar(PRESTAMOS, prestamo.id, { ...prestamo, estado: "prestado" } satisfies Prestamo);
     return { ok: true, equipo: { id, nombre: equipo.nombre, estado: "prestado", persona: activo.persona, devolucion: activo.devolucion } };
+  });
+}
+
+/** Apunta la devolución de un equipo prestado: vuelve a estar disponible y su préstamo queda como devuelto. */
+export async function devolverEquipo(almacen: Almacen, id: string): Promise<ResultadoSolicitud> {
+  const equipo = await obtenerEquipo(almacen, id);
+  if (!equipo) return { ok: false, status: 404, error: NO_EXISTE };
+  return almacen.transaccion<ResultadoSolicitud>(async (tx) => {
+    const activo = await tx.obtener<PrestamoActivo>(ACTIVOS, id);
+    if (activo?.estado !== "prestado") return { ok: false, status: 409, error: NO_PRESTADO };
+    const prestamo = await tx.obtener<Prestamo>(PRESTAMOS, activo.prestamo);
+    if (prestamo) tx.guardar(PRESTAMOS, prestamo.id, { ...prestamo, estado: "devuelto" } satisfies Prestamo);
+    tx.borrar(ACTIVOS, id);
+    return { ok: true, equipo: { id, nombre: equipo.nombre, estado: "disponible" } };
   });
 }
 

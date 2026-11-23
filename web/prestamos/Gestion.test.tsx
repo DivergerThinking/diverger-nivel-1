@@ -75,6 +75,19 @@ describe("pantalla Gestión de préstamos", () => {
     });
   });
 
+  it("enseña tal cual el 409 y el 404 de la API al apuntar la devolución", async () => {
+    for (const [status, error] of [
+      [409, "El equipo no está prestado"],
+      [404, "No existe el equipo"],
+    ] as const) {
+      vi.stubGlobal("fetch", (ruta: string) => Promise.resolve(ruta === "/api/equipos" ? respuesta(EQUIPOS) : respuesta({ error }, status)));
+      render(<Gestion sesion={SESION} />);
+      fireEvent.click(await screen.findByRole("button", { name: "Apuntar devolución de Proyector 01" }));
+      expect((await screen.findByRole("alert")).textContent).toBe(error);
+      cleanup();
+    }
+  });
+
   it("presta en el mostrador con la persona y la fecha escritas", async () => {
     const fetch = vi.fn((ruta: string) => Promise.resolve(respuesta(ruta === "/api/equipos" ? EQUIPOS : EQUIPOS[1], ruta === "/api/equipos" ? 200 : 201)));
     vi.stubGlobal("fetch", fetch);
