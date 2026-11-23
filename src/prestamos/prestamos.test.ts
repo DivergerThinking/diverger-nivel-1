@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Fastify from "fastify";
 import { almacenEnMemoria } from "../../lib/datos.js";
 import { rutas } from "./index.js";
-import { esCuentaDeIT, esOperacionDeIT } from "./prestamos.js";
+import { esCuentaDeIT, esOperacionDeIT, hoyEnMadrid } from "./prestamos.js";
 
 // La sesión de prueba se toma de la cabecera x-correo; el servidor real la saca del token de Google
 // y responde 401 «Inicia sesión con Google.» sin token válido (app/server.ts).
@@ -90,6 +90,124 @@ describe("GET /api/equipos", () => {
     const deIT = await app.inject({ method: "GET", url: "/api/equipos", headers: { "x-correo": "it@empresa.com" } });
     expect(deIT.statusCode).toBe(200);
     expect((await ver(app)).statusCode).toBe(200);
+  });
+});
+
+describe("POST /api/equipos/:id/solicitud", () => {
+  const pedir = (app: Awaited<ReturnType<typeof servidor>>["app"], id: string, cuerpo: unknown, correo = "ana.perez@empresa.com") =>
+    app.inject({ method: "POST", url: `/api/equipos/${id}/solicitud`, headers: { "x-correo": correo }, payload: cuerpo as object });
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-23T10:00:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reserva el equipo disponible a nombre de quien lo pide y responde 201", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e1", { id: "e1", nombre: "Portátil 07" });
+    const respuesta = await pedir(app, "e1", { devolucion: "2026-12-15" });
+    expect(respuesta.statusCode).toBe(201);
+    expect(respuesta.json()).toEqual({
+      id: "e1",
+      nombre: "Portátil 07",
+      estado: "reservado",
+      persona: "ana.perez@empresa.com",
+      devolucion: "2026-12-15",
+    });
+    expect((await ver(app)).json()).toEqual([respuesta.json()]);
+    const prestamos = await almacen.listar<{ equipo: string; estado: string; persona: string }>("prestamos_prestamos");
+    expect(prestamos).toHaveLength(1);
+    expect(prestamos[0]).toMatchObject({ equipo: "e1", estado: "reservado", persona: "ana.perez@empresa.com" });
+  });
+
+  it("responde 409 si el equipo está reservado y lo deja a nombre de quien lo tenía", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e2", { id: "e2", nombre: "Monitor 03" });
+    await almacen.guardar("prestamos_activos", "e2", {
+      id: "e2",
+      prestamo: "p2",
+      persona: "luis.garcia@empresa.com",
+      devolucion: "2026-12-15",
+      estado: "reservado",
+    });
+    const respuesta = await pedir(app, "e2", { devolucion: "2026-12-15" });
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está disponible" });
+    const activo = await almacen.obtener<{ persona: string; estado: string }>("prestamos_activos", "e2");
+    expect(activo).toMatchObject({ persona: "luis.garcia@empresa.com", estado: "reservado" });
+    expect(await almacen.listar("prestamos_prestamos")).toHaveLength(0);
+  });
+
+  it("responde 409 si el equipo está prestado", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e2", { id: "e2", nombre: "Monitor 03" });
+    await almacen.guardar("prestamos_activos", "e2", {
+      id: "e2",
+      prestamo: "p2",
+      persona: "luis.garcia@empresa.com",
+      devolucion: "2026-12-15",
+      estado: "prestado",
+    });
+    const respuesta = await pedir(app, "e2", { devolucion: "2026-12-15" });
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está disponible" });
+  });
+
+  it("responde 404 si el equipo no existe", async () => {
+    const { app } = await servidor();
+    const respuesta = await pedir(app, "no-existe", { devolucion: "2026-12-15" });
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("lo puede pedir una cuenta de IT", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e1", { id: "e1", nombre: "Portátil 07" });
+    expect((await pedir(app, "e1", { devolucion: "2026-12-15" }, "it@empresa.com")).statusCode).toBe(201);
+  });
+
+  it("responde 400 y deja el equipo disponible si falta la fecha, no es real o ya ha pasado", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e1", { id: "e1", nombre: "Portátil 07" });
+    const casos: [unknown, string][] = [
+      [{}, "Falta la fecha de devolución"],
+      [{ devolucion: "" }, "Falta la fecha de devolución"],
+      [{ devolucion: "2026-02-30" }, "La fecha de devolución no es válida"],
+      [{ devolucion: "15/12/2026" }, "La fecha de devolución no es válida"],
+      [{ devolucion: "2026-11-22" }, "La fecha de devolución ya ha pasado"],
+    ];
+    for (const [cuerpo, error] of casos) {
+      const respuesta = await pedir(app, "e1", cuerpo);
+      expect(respuesta.statusCode).toBe(400);
+      expect(respuesta.json()).toEqual({ error });
+    }
+    expect(await almacen.listar("prestamos_activos")).toHaveLength(0);
+  });
+
+  it("acepta la fecha de hoy", async () => {
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e1", { id: "e1", nombre: "Portátil 07" });
+    expect((await pedir(app, "e1", { devolucion: "2026-11-23" })).statusCode).toBe(201);
+  });
+
+  it("toma como hoy el día en Madrid, no el de UTC", async () => {
+    vi.setSystemTime(new Date("2026-11-23T23:30:00Z")); // las 00:30 del 24 en Madrid
+    const { app, almacen } = await servidor();
+    await almacen.guardar("equipos_equipos", "e1", { id: "e1", nombre: "Portátil 07" });
+    const respuesta = await pedir(app, "e1", { devolucion: "2026-11-23" });
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json()).toEqual({ error: "La fecha de devolución ya ha pasado" });
+  });
+});
+
+describe("hoyEnMadrid", () => {
+  it("da el día en Madrid", () => {
+    expect(hoyEnMadrid(new Date("2026-11-23T23:30:00Z"))).toBe("2026-11-24");
+    expect(hoyEnMadrid(new Date("2026-11-23T10:00:00Z"))).toBe("2026-11-23");
   });
 });
 
