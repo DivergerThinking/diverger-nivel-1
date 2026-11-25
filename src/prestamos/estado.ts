@@ -10,6 +10,8 @@ export interface EstadoEquipo {
   estado: EquipoConEstado["estado"];
   persona?: string;
   devolucion?: string;
+  /** El id del préstamo en curso, para actualizarlo en el mismo cambio de estado. */
+  prestamo?: string;
 }
 
 const ESTADOS = "estadosEquipo";
