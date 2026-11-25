@@ -113,6 +113,20 @@ export async function prestarEquipo(
   });
 }
 
+/** Apunta la devolución de un equipo prestado: vuelve a estar disponible y su préstamo queda como devuelto. */
+export async function registrarDevolucion(almacen: Almacen, id: string): Promise<Resultado<EquipoConEstado>> {
+  const equipo = await obtenerEquipo(almacen, id);
+  if (!equipo) return { ok: false, status: 404, error: "No existe el equipo" };
+  return almacen.transaccion<Resultado<EquipoConEstado>>(async (tx) => {
+    const actual = await tx.obtener<EstadoEquipo>(ESTADOS, id);
+    if (actual?.estado !== "prestado") return { ok: false, status: 409, error: "El equipo no está prestado" };
+    const registro = actual.prestamo ? await tx.obtener<Prestamo>(PRESTAMOS, actual.prestamo) : undefined;
+    tx.guardar(ESTADOS, id, { estado: "disponible" } satisfies EstadoEquipo);
+    if (actual.prestamo && registro) tx.guardar(PRESTAMOS, actual.prestamo, { ...registro, estado: "devuelto" } satisfies Prestamo);
+    return { ok: true, valor: { id, nombre: equipo.nombre, estado: "disponible" } };
+  });
+}
+
 /** Entrega un equipo reservado, con la persona y la fecha de la solicitud. */
 export async function entregarEquipo(almacen: Almacen, id: string): Promise<Resultado<EquipoConEstado>> {
   const equipo = await obtenerEquipo(almacen, id);
