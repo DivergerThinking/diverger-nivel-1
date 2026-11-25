@@ -2,6 +2,7 @@
 import { siPuedeLlamar, type Pantalla } from "../pantallas.js";
 import { Equipos } from "./Equipos.js";
 import { Gestion } from "./Gestion.js";
+import { Vencidos } from "./Vencidos.js";
 
 export const pantallas: Pantalla[] = [
   { id: "prestamos-equipos", titulo: "Equipos", Componente: Equipos },
@@ -9,6 +10,12 @@ export const pantallas: Pantalla[] = [
     id: "prestamos-gestion",
     titulo: "Gestión de préstamos",
     Componente: Gestion,
+    visible: siPuedeLlamar("/api/prestamos/vencidos"),
+  },
+  {
+    id: "prestamos-vencidos",
+    titulo: "Préstamos vencidos",
+    Componente: Vencidos,
     visible: siPuedeLlamar("/api/prestamos/vencidos"),
   },
 ];
