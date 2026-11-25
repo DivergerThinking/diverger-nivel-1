@@ -3,7 +3,7 @@ import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import "../../lib/auth.js";
 import type { OpcionesContexto } from "../../lib/datos.js";
 import { listarConEstado } from "./estado.js";
-import { entregarEquipo, esDeIT, listarVencidos, prestarEquipo, registrarDevolucion, solicitarEquipo } from "./operaciones.js";
+import { entregarEquipo, esDeIT, listarVencidos, obtenerHistorial, prestarEquipo, registrarDevolucion, solicitarEquipo } from "./operaciones.js";
 
 /** Responde 403 «Solo IT puede hacer esto.» si la sesión no es de una cuenta de CORREOS_IT; devuelve true si ha respondido. */
 function negarSiNoEsIT(request: FastifyRequest, reply: FastifyReply): boolean {
@@ -19,6 +19,13 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
   app.get("/api/prestamos/vencidos", (request, reply) => {
     if (negarSiNoEsIT(request, reply)) return reply;
     return listarVencidos(almacen);
+  });
+
+  app.get<{ Params: { id: string } }>("/api/equipos/:id/historial", async (request, reply) => {
+    if (negarSiNoEsIT(request, reply)) return reply;
+    const resultado = await obtenerHistorial(almacen, request.params.id);
+    if (!resultado.ok) return reply.code(resultado.status).send({ error: resultado.error });
+    return reply.code(200).send(resultado.valor);
   });
 
   app.post<{ Params: { id: string } }>("/api/equipos/:id/solicitud", async (request, reply) => {
