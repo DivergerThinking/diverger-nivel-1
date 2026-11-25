@@ -58,6 +58,59 @@ describe("sesión de la API de préstamos (HU-ACC-01)", () => {
   });
 });
 
+describe("pedir un equipo disponible (HU-SOL-02)", () => {
+  const pedir = (id: string, payload: object) =>
+    app.inject({
+      method: "POST",
+      url: `/api/equipos/${id}/solicitud`,
+      headers: { authorization: "Bearer token-ana" },
+      payload,
+    });
+
+  beforeEach(async () => {
+    await almacen.guardar("equipos", "42", { nombre: "Portátil 07", nombreNormalizado: "portátil 07" });
+    await almacen.guardar("nombresEquipo", "portátil%2007", { equipo: "42" });
+  });
+
+  it("responde 201 con el equipo reservado a quien lo pide y guarda el préstamo", async () => {
+    const respuesta = await pedir("42", { devolucion: "2999-12-01" });
+    expect(respuesta.statusCode).toBe(201);
+    expect(respuesta.json()).toEqual({
+      id: "42",
+      nombre: "Portátil 07",
+      estado: "reservado",
+      persona: "ana.perez@empresa.com",
+      devolucion: "2999-12-01",
+    });
+    expect(await almacen.listar("prestamos")).toMatchObject([{ equipo: "42", persona: "ana.perez@empresa.com", estado: "reservado" }]);
+  });
+
+  it("responde 400 con el mensaje del contrato y el equipo sigue disponible", async () => {
+    const casos: [object, string][] = [
+      [{ devolucion: "2000-01-01" }, "La fecha de devolución ya ha pasado"],
+      [{ devolucion: "2026-02-30" }, "La fecha de devolución no es válida"],
+      [{}, "Falta la fecha de devolución"],
+    ];
+    for (const [payload, error] of casos) {
+      const respuesta = await pedir("42", payload);
+      expect(respuesta.statusCode).toBe(400);
+      expect(respuesta.json()).toEqual({ error });
+    }
+    expect(await almacen.obtener("estadosEquipo", "42")).toBeUndefined();
+    expect((await listar("token-ana")).json()).toEqual([{ id: "42", nombre: "Portátil 07", estado: "disponible" }]);
+  });
+
+  it("responde 409 si el equipo ya está reservado a otra persona y 404 si no existe", async () => {
+    await almacen.guardar("estadosEquipo", "42", { estado: "reservado", persona: "luis.gomez@empresa.com", devolucion: "2999-12-01" });
+    const ocupado = await pedir("42", { devolucion: "2999-12-01" });
+    expect(ocupado.statusCode).toBe(409);
+    expect(ocupado.json()).toEqual({ error: "El equipo no está disponible" });
+    const inexistente = await pedir("999", { devolucion: "2999-12-01" });
+    expect(inexistente.statusCode).toBe(404);
+    expect(inexistente.json()).toEqual({ error: "No existe el equipo" });
+  });
+});
+
 describe("lista de equipos", () => {
   it("responde 200 con una lista vacía si no hay equipos", async () => {
     const respuesta = await listar("token-ana");
