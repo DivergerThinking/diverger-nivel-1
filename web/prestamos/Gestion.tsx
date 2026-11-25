@@ -11,7 +11,46 @@ interface Equipo {
 
 const mensaje = (motivo: unknown): string => (motivo instanceof Error ? motivo.message : String(motivo));
 
-/** Gestión de préstamos para IT: lista los equipos y entrega los reservados con POST /api/equipos/{id}/entrega. */
+/** Formulario del mostrador de un equipo disponible: persona y fecha de devolución. */
+function Mostrador({ equipo, prestar }: { equipo: Equipo; prestar: (equipo: Equipo, persona: string, devolucion: string) => void }) {
+  const [persona, setPersona] = useState("");
+  const [devolucion, setDevolucion] = useState("");
+  return (
+    <form
+      onSubmit={(evento) => {
+        evento.preventDefault();
+        prestar(equipo, persona, devolucion);
+      }}
+    >
+      <label>
+        Persona de {equipo.nombre}
+        <input
+          value={persona}
+          onChange={(evento) => {
+            setPersona(evento.target.value);
+          }}
+        />
+      </label>
+      <label>
+        Devolución de {equipo.nombre}
+        <input
+          type="text"
+          placeholder="AAAA-MM-DD"
+          value={devolucion}
+          onChange={(evento) => {
+            setDevolucion(evento.target.value);
+          }}
+        />
+      </label>
+      <button type="submit">Prestar {equipo.nombre}</button>
+    </form>
+  );
+}
+
+/**
+ * Gestión de préstamos para IT: lista los equipos, entrega los reservados con POST /api/equipos/{id}/entrega y presta
+ * los disponibles en el mostrador con POST /api/equipos/{id}/prestamo.
+ */
 export function Gestion({ sesion }: { sesion: Sesion }) {
   const [equipos, setEquipos] = useState<Equipo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +68,15 @@ export function Gestion({ sesion }: { sesion: Sesion }) {
   const entregar = (equipo: Equipo) => {
     setError(null);
     api(sesion, `/api/equipos/${encodeURIComponent(equipo.id)}/entrega`, { metodo: "POST" })
+      .then(cargar)
+      .catch((motivo: unknown) => {
+        setError(mensaje(motivo));
+      });
+  };
+
+  const prestar = (equipo: Equipo, persona: string, devolucion: string) => {
+    setError(null);
+    api(sesion, `/api/equipos/${encodeURIComponent(equipo.id)}/prestamo`, { metodo: "POST", cuerpo: { persona, devolucion } })
       .then(cargar)
       .catch((motivo: unknown) => {
         setError(mensaje(motivo));
@@ -57,6 +105,7 @@ export function Gestion({ sesion }: { sesion: Sesion }) {
                   Entregar {equipo.nombre}
                 </button>
               )}
+              {equipo.estado === "disponible" && <Mostrador equipo={equipo} prestar={prestar} />}
             </li>
           ))}
         </ul>
