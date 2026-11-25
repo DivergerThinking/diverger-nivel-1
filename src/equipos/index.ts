@@ -4,7 +4,7 @@ import "../../lib/auth.js";
 import type { OpcionesContexto } from "../../lib/datos.js";
 import { darDeAlta } from "./equipo.js";
 
-export { obtenerEquipo, type EquipoConId } from "./equipo.js";
+export { listarEquipos, obtenerEquipo, type EquipoConId } from "./equipo.js";
 
 /** Si el correo está en CORREOS_IT (lista separada por comas, sin distinguir mayúsculas), fijada en el despliegue. */
 function esDeIT(email: string): boolean {

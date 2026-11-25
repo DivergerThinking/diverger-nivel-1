@@ -49,6 +49,16 @@ export async function darDeAlta(almacen: Almacen, nombre: unknown): Promise<Resu
   });
 }
 
+/** Todos los equipos dados de alta, con su id, ordenados por nombre. */
+export async function listarEquipos(almacen: Almacen): Promise<EquipoConId[]> {
+  // Los equipos no guardan su id: lo da el índice de nombres, que apunta a cada equipo.
+  const indice = await almacen.listar<NombreEquipo>(NOMBRES);
+  const equipos = await Promise.all(indice.map((entrada) => obtenerEquipo(almacen, entrada.equipo)));
+  return equipos
+    .filter((equipo): equipo is EquipoConId => equipo !== undefined)
+    .sort((a, b) => a.nombreNormalizado.localeCompare(b.nombreNormalizado, "es"));
+}
+
 /** El equipo con ese id, o undefined si no existe. */
 export async function obtenerEquipo(almacen: Almacen, id: string): Promise<EquipoConId | undefined> {
   const equipo = await almacen.obtener<Equipo>(EQUIPOS, id);
