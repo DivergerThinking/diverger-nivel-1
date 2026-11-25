@@ -49,7 +49,8 @@ function Mostrador({ equipo, prestar }: { equipo: Equipo; prestar: (equipo: Equi
 
 /**
  * Gestión de préstamos para IT: lista los equipos, entrega los reservados con POST /api/equipos/{id}/entrega y presta
- * los disponibles en el mostrador con POST /api/equipos/{id}/prestamo.
+ * los disponibles en el mostrador con POST /api/equipos/{id}/prestamo y apunta la devolución de los prestados con
+ * POST /api/equipos/{id}/devolucion.
  */
 export function Gestion({ sesion }: { sesion: Sesion }) {
   const [equipos, setEquipos] = useState<Equipo[] | null>(null);
@@ -83,6 +84,15 @@ export function Gestion({ sesion }: { sesion: Sesion }) {
       });
   };
 
+  const devolver = (equipo: Equipo) => {
+    setError(null);
+    api(sesion, `/api/equipos/${encodeURIComponent(equipo.id)}/devolucion`, { metodo: "POST" })
+      .then(cargar)
+      .catch((motivo: unknown) => {
+        setError(mensaje(motivo));
+      });
+  };
+
   return (
     <section aria-labelledby="gestion">
       <h2 id="gestion">Gestión de préstamos</h2>
@@ -103,6 +113,16 @@ export function Gestion({ sesion }: { sesion: Sesion }) {
                   }}
                 >
                   Entregar {equipo.nombre}
+                </button>
+              )}
+              {equipo.estado === "prestado" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    devolver(equipo);
+                  }}
+                >
+                  Apuntar devolución de {equipo.nombre}
                 </button>
               )}
               {equipo.estado === "disponible" && <Mostrador equipo={equipo} prestar={prestar} />}

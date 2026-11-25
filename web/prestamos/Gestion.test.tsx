@@ -95,6 +95,36 @@ describe("pantalla Gestión de préstamos", () => {
     });
   });
 
+  it("apunta la devolución de un equipo prestado con el token de la sesión y recarga la lista", async () => {
+    const PRESTADO = { ...RESERVADO, estado: "prestado" };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(respuesta([PRESTADO]))
+      .mockResolvedValueOnce(respuesta({ id: "42", nombre: "Portátil 07", estado: "disponible" }))
+      .mockResolvedValueOnce(respuesta([{ id: "42", nombre: "Portátil 07", estado: "disponible" }]));
+    vi.stubGlobal("fetch", fetch);
+    render(<Gestion sesion={SESION} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Apuntar devolución de Portátil 07" }));
+    expect(await screen.findByText(/Portátil 07: disponible/)).toBeTruthy();
+    expect(fetch).toHaveBeenNthCalledWith(2, "/api/equipos/42/devolucion", {
+      method: "POST",
+      headers: { authorization: "Bearer token-de-it" },
+    });
+  });
+
+  it("enseña tal cual el error «El equipo no está prestado» de la devolución", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(respuesta([{ ...RESERVADO, estado: "prestado" }]))
+      .mockResolvedValueOnce(respuesta({ error: "El equipo no está prestado" }, 409));
+    vi.stubGlobal("fetch", fetch);
+    render(<Gestion sesion={SESION} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Apuntar devolución de Portátil 07" }));
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toBe("El equipo no está prestado");
+    });
+  });
+
   it("se registra solo para IT: visible según GET /api/prestamos/vencidos", async () => {
     const gestion = pantallas.find((p) => p.id === "prestamos-gestion");
     expect(gestion?.visible).toBeDefined();
