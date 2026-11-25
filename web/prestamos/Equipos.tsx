@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, type Sesion } from "../pantallas.js";
 
 interface Equipo {
@@ -9,18 +9,36 @@ interface Equipo {
   devolucion?: string;
 }
 
-/** Lista los equipos con GET /api/equipos; si la API falla, por ejemplo sin sesión, enseña su mensaje. */
+const mensaje = (motivo: unknown): string => (motivo instanceof Error ? motivo.message : String(motivo));
+
+/** Lista los equipos con GET /api/equipos y pide uno disponible con POST /api/equipos/{id}/solicitud. */
 export function Equipos({ sesion }: { sesion: Sesion }) {
   const [equipos, setEquipos] = useState<Equipo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fechas, setFechas] = useState<Record<string, string>>({});
 
-  useEffect(() => {
+  const cargar = useCallback(() => {
     api<Equipo[]>(sesion, "/api/equipos")
       .then(setEquipos)
       .catch((motivo: unknown) => {
-        setError(motivo instanceof Error ? motivo.message : String(motivo));
+        setError(mensaje(motivo));
       });
   }, [sesion]);
+
+  useEffect(cargar, [cargar]);
+
+  const pedir = (equipo: Equipo) => {
+    setError(null);
+    const devolucion = fechas[equipo.id] ?? "";
+    api(sesion, `/api/equipos/${encodeURIComponent(equipo.id)}/solicitud`, {
+      metodo: "POST",
+      cuerpo: devolucion === "" ? {} : { devolucion },
+    })
+      .then(cargar)
+      .catch((motivo: unknown) => {
+        setError(mensaje(motivo));
+      });
+  };
 
   return (
     <section aria-labelledby="equipos">
@@ -34,6 +52,29 @@ export function Equipos({ sesion }: { sesion: Sesion }) {
               {equipo.nombre}: {equipo.estado}
               {equipo.persona && ` a ${equipo.persona}`}
               {equipo.devolucion && ` hasta el ${equipo.devolucion}`}
+              {equipo.estado === "disponible" && (
+                <>
+                  {" "}
+                  <label>
+                    Fecha de devolución de {equipo.nombre}{" "}
+                    <input
+                      type="date"
+                      value={fechas[equipo.id] ?? ""}
+                      onChange={(evento) => {
+                        setFechas({ ...fechas, [equipo.id]: evento.target.value });
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      pedir(equipo);
+                    }}
+                  >
+                    Pedir {equipo.nombre}
+                  </button>
+                </>
+              )}
             </li>
           ))}
         </ul>
