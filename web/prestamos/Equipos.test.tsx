@@ -1,0 +1,51 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import type { Sesion } from "../pantallas.js";
+import { Equipos } from "./Equipos.js";
+import { pantallas } from "./index.js";
+
+const SESION: Sesion = { token: "token-de-ana", persona: { email: "ana.perez@empresa.com", nombre: "Ana" } };
+
+function respuesta(cuerpo: unknown, status = 200): Response {
+  return new Response(JSON.stringify(cuerpo), { status, headers: { "content-type": "application/json" } });
+}
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+describe("pantalla Equipos", () => {
+  it("lista los equipos con su estado, persona y devolución, llamando con el token de la sesión", async () => {
+    const fetch = vi.fn(() =>
+      Promise.resolve(
+        respuesta([
+          { id: "1", nombre: "Portátil 07", estado: "disponible" },
+          { id: "2", nombre: "Proyector 02", estado: "prestado", persona: "luis.gomez@empresa.com", devolucion: "2026-12-01" },
+        ]),
+      ),
+    );
+    vi.stubGlobal("fetch", fetch);
+    render(<Equipos sesion={SESION} />);
+    expect(await screen.findByText("Portátil 07: disponible")).toBeTruthy();
+    expect(screen.getByText("Proyector 02: prestado a luis.gomez@empresa.com hasta el 2026-12-01")).toBeTruthy();
+    expect(fetch).toHaveBeenCalledWith("/api/equipos", { method: "GET", headers: { authorization: "Bearer token-de-ana" } });
+  });
+
+  it("avisa de que no hay equipos si la lista llega vacía", async () => {
+    vi.stubGlobal("fetch", () => Promise.resolve(respuesta([])));
+    render(<Equipos sesion={SESION} />);
+    expect(await screen.findByText("No hay equipos dados de alta.")).toBeTruthy();
+  });
+
+  it("enseña tal cual el error 401 de la API", async () => {
+    vi.stubGlobal("fetch", () => Promise.resolve(respuesta({ error: "Inicia sesión con Google." }, 401)));
+    render(<Equipos sesion={SESION} />);
+    expect((await screen.findByRole("alert")).textContent).toBe("Inicia sesión con Google.");
+  });
+
+  it("se registra como pantalla para cualquiera con sesión", () => {
+    expect(pantallas.map((p) => p.id)).toEqual(["prestamos-equipos"]);
+    expect(pantallas[0]?.visible).toBeUndefined();
+  });
+});

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { crearServidor } from "../../app/server.js";
 import { almacenEnMemoria, type Almacen } from "../../lib/datos.js";
-import { obtenerEquipo, rutas } from "./index.js";
+import { listarEquipos, obtenerEquipo, rutas } from "./index.js";
 
 const IT = { email: "it@empresa.com", nombre: "IT" };
 const ANA = { email: "ana.perez@empresa.com", nombre: "Ana" };
@@ -95,6 +95,18 @@ describe("alta de equipos", () => {
   it("reconoce a IT sin distinguir mayúsculas en el correo", async () => {
     process.env["CORREOS_IT"] = "IT@Empresa.com, inventario@empresa.com";
     expect((await alta("Portátil 07")).statusCode).toBe(201);
+  });
+});
+
+describe("listarEquipos", () => {
+  it("devuelve los equipos con su id, ordenados por nombre, y una lista vacía si no hay", async () => {
+    expect(await listarEquipos(almacen)).toEqual([]);
+    const monitor = (await alta("Monitor 03")).json<{ id: string }>();
+    const portatil = (await alta("Portátil 07")).json<{ id: string }>();
+    expect(await listarEquipos(almacen)).toEqual([
+      { id: monitor.id, nombre: "Monitor 03", nombreNormalizado: "monitor 03" },
+      { id: portatil.id, nombre: "Portátil 07", nombreNormalizado: "portátil 07" },
+    ]);
   });
 });
 
