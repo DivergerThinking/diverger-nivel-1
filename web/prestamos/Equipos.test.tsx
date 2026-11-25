@@ -104,7 +104,7 @@ describe("pantalla Equipos", () => {
   });
 
   it("se registra como pantalla para cualquiera con sesión", () => {
-    expect(pantallas.map((p) => p.id)).toEqual(["prestamos-equipos", "prestamos-gestion", "prestamos-vencidos"]);
+    expect(pantallas.map((p) => p.id)).toEqual(["prestamos-equipos", "prestamos-gestion", "prestamos-vencidos", "prestamos-historial"]);
     expect(pantallas[0]?.visible).toBeUndefined();
   });
 });

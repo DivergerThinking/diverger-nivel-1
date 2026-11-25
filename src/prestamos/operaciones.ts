@@ -6,6 +6,7 @@ import type { EquipoConEstado, EstadoEquipo } from "./estado.js";
 import type { components } from "./api.gen.js";
 
 type Vencido = components["schemas"]["Vencido"];
+type EntradaHistorial = components["schemas"]["EntradaHistorial"];
 
 /** Un préstamo tal como se guarda en la colección `prestamos`. */
 interface Prestamo {
@@ -50,6 +51,17 @@ export async function listarVencidos(almacen: Almacen, hoy: string = hoyEnMadrid
     }
   }
   return vencidos.sort((a, b) => a.devolucion.localeCompare(b.devolucion));
+}
+
+/** Los préstamos de un equipo, del más reciente al más antiguo; 404 si el equipo no existe. */
+export async function obtenerHistorial(almacen: Almacen, id: string): Promise<Resultado<EntradaHistorial[]>> {
+  if (!(await obtenerEquipo(almacen, id))) return { ok: false, status: 404, error: "No existe el equipo" };
+  const prestamos = (await almacen.listar<Prestamo>(PRESTAMOS)).filter((p) => p.equipo === id);
+  prestamos.sort((a, b) => b.creado.localeCompare(a.creado));
+  return {
+    ok: true,
+    valor: prestamos.map(({ persona, devolucion, estado }) => ({ persona, devolucion, estado })),
+  };
 }
 
 /** Reserva un equipo disponible a quien lo pide; el estado y el préstamo se escriben en la misma transacción. */
