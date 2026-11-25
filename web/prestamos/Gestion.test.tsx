@@ -61,6 +61,40 @@ describe("pantalla Gestión de préstamos", () => {
     });
   });
 
+  it("presta un equipo disponible en el mostrador con la persona y la fecha, y recarga la lista", async () => {
+    const DISPONIBLE = { id: "42", nombre: "Portátil 07", estado: "disponible" };
+    const PRESTADO = { ...DISPONIBLE, estado: "prestado", persona: "luis.gomez@empresa.com", devolucion: "2026-12-01" };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(respuesta([DISPONIBLE]))
+      .mockResolvedValueOnce(respuesta(PRESTADO, 201))
+      .mockResolvedValueOnce(respuesta([PRESTADO]));
+    vi.stubGlobal("fetch", fetch);
+    render(<Gestion sesion={SESION} />);
+    fireEvent.change(await screen.findByLabelText("Persona de Portátil 07"), { target: { value: "luis.gomez@empresa.com" } });
+    fireEvent.change(screen.getByLabelText("Devolución de Portátil 07"), { target: { value: "2026-12-01" } });
+    fireEvent.click(screen.getByRole("button", { name: "Prestar Portátil 07" }));
+    expect(await screen.findByText(/Portátil 07: prestado a luis.gomez@empresa.com hasta el 2026-12-01/)).toBeTruthy();
+    expect(fetch).toHaveBeenNthCalledWith(2, "/api/equipos/42/prestamo", {
+      method: "POST",
+      headers: { authorization: "Bearer token-de-it", "content-type": "application/json" },
+      body: JSON.stringify({ persona: "luis.gomez@empresa.com", devolucion: "2026-12-01" }),
+    });
+  });
+
+  it("enseña tal cual el error del préstamo en el mostrador", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(respuesta([{ id: "42", nombre: "Portátil 07", estado: "disponible" }]))
+      .mockResolvedValueOnce(respuesta({ error: "Faltan la persona o la fecha de devolución" }, 400));
+    vi.stubGlobal("fetch", fetch);
+    render(<Gestion sesion={SESION} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Prestar Portátil 07" }));
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toBe("Faltan la persona o la fecha de devolución");
+    });
+  });
+
   it("se registra solo para IT: visible según GET /api/prestamos/vencidos", async () => {
     const gestion = pantallas.find((p) => p.id === "prestamos-gestion");
     expect(gestion?.visible).toBeDefined();

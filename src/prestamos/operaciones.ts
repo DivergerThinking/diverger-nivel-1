@@ -83,6 +83,36 @@ export async function solicitarEquipo(
   });
 }
 
+/** Presta un equipo disponible en el mostrador; IT puede poner una fecha ya pasada. Estado y préstamo, en una transacción. */
+export async function prestarEquipo(
+  almacen: Almacen,
+  id: string,
+  persona: unknown,
+  devolucion: unknown,
+): Promise<Resultado<EquipoConEstado>> {
+  const equipo = await obtenerEquipo(almacen, id);
+  if (!equipo) return { ok: false, status: 404, error: "No existe el equipo" };
+  if (typeof persona !== "string" || persona.trim() === "" || typeof devolucion !== "string" || devolucion === "") {
+    return { ok: false, status: 400, error: "Faltan la persona o la fecha de devolución" };
+  }
+  if (!esFechaReal(devolucion)) return { ok: false, status: 400, error: "La fecha de devolución no es válida" };
+  const quien = persona.trim();
+  return almacen.transaccion<Resultado<EquipoConEstado>>(async (tx) => {
+    const actual = await tx.obtener<EstadoEquipo>(ESTADOS, id);
+    if (actual && actual.estado !== "disponible") return { ok: false, status: 409, error: "El equipo no está disponible" };
+    const prestamo = randomUUID();
+    tx.guardar(ESTADOS, id, { estado: "prestado", persona: quien, devolucion, prestamo } satisfies EstadoEquipo);
+    tx.guardar(PRESTAMOS, prestamo, {
+      equipo: id,
+      persona: quien,
+      devolucion,
+      estado: "prestado",
+      creado: new Date().toISOString(),
+    } satisfies Prestamo);
+    return { ok: true, valor: { id, nombre: equipo.nombre, estado: "prestado", persona: quien, devolucion } };
+  });
+}
+
 /** Entrega un equipo reservado, con la persona y la fecha de la solicitud. */
 export async function entregarEquipo(almacen: Almacen, id: string): Promise<Resultado<EquipoConEstado>> {
   const equipo = await obtenerEquipo(almacen, id);
