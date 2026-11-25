@@ -28,7 +28,7 @@ Lleva el estado de cada equipo y sus préstamos: las solicitudes de los empleado
 
 ## Dependencias
 
-- `equipos`: comprueba que el equipo existe y lee su nombre a través de su `index.ts`.
+- `equipos`: comprueba que el equipo existe, lee su nombre y lista todos los equipos (`listarEquipos`) a través de su `index.ts`.
 
 ## Decisiones
 

@@ -23,7 +23,7 @@ Mantiene el inventario de equipos de la oficina: IT da de alta cada equipo con u
 
 ## Dependencias
 
-Ninguna.
+Ninguna. Su `index.ts` exporta `obtenerEquipo(almacen, id)` y `listarEquipos(almacen)`, que devuelve todos los equipos con su id y su nombre, para los contextos que lo usan.
 
 ## Decisiones
 
