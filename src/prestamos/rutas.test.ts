@@ -157,6 +157,68 @@ describe("POST /api/equipos/{id}/solicitud", () => {
   });
 });
 
+describe("POST /api/equipos/{id}/entrega", () => {
+  const IT = "it@empresa.com";
+  const entregar = (id: string, correo = IT) =>
+    app.inject({ method: "POST", url: `/api/equipos/${id}/entrega`, headers: { "x-correo": correo } });
+
+  it("entrega un equipo reservado: prestado con la misma persona y devolución", async () => {
+    const id = await altaEquipo("Portátil 07");
+    await solicitar(id, { devolucion: FUTURA });
+    const respuesta = await entregar(id);
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json()).toEqual({ id, nombre: "Portátil 07", estado: "prestado", persona: ANA, devolucion: FUTURA });
+    const lista = (await app.inject({ url: "/api/equipos", headers: { "x-correo": ANA } })).json<unknown[]>();
+    expect(lista).toEqual([{ id, nombre: "Portátil 07", estado: "prestado", persona: ANA, devolucion: FUTURA }]);
+  });
+
+  it("actualiza el movimiento del historial en vez de añadir otro", async () => {
+    const id = await altaEquipo("Portátil 07");
+    await solicitar(id, { devolucion: FUTURA });
+    await entregar(id);
+    const historial = await almacen.listar<{ equipoId: string; estado: string }>("historialPrestamos");
+    expect(historial).toMatchObject([{ equipoId: id, estado: "prestado" }]);
+  });
+
+  it("un equipo disponible responde 409 «El equipo no está reservado»", async () => {
+    const id = await altaEquipo("Portátil 07");
+    const respuesta = await entregar(id);
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está reservado" });
+  });
+
+  it("un equipo ya prestado responde 409 «El equipo no está reservado»", async () => {
+    const id = await altaEquipo("Portátil 07");
+    await solicitar(id, { devolucion: FUTURA });
+    await entregar(id);
+    const respuesta = await entregar(id);
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está reservado" });
+  });
+
+  it("un equipo que no existe responde 404 «No existe el equipo»", async () => {
+    const respuesta = await entregar("no-existe");
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("una cuenta que no es de IT responde 403 y no entrega", async () => {
+    const id = await altaEquipo("Portátil 07");
+    await solicitar(id, { devolucion: FUTURA });
+    const respuesta = await entregar(id, ANA);
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+    const lista = (await app.inject({ url: "/api/equipos", headers: { "x-correo": ANA } })).json<{ estado: string }[]>();
+    expect(lista[0]?.estado).toBe("reservado");
+  });
+
+  it("sin sesión responde 401", async () => {
+    const id = await altaEquipo("Portátil 07");
+    const respuesta = await app.inject({ method: "POST", url: `/api/equipos/${id}/entrega` });
+    expect(respuesta.statusCode).toBe(401);
+  });
+});
+
 describe("fechas", () => {
   it("esFechaValida solo admite días que existen", () => {
     expect(esFechaValida("2028-02-29")).toBe(true);
