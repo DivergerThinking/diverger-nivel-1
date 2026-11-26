@@ -3,7 +3,7 @@ import type { FastifyPluginAsync } from "fastify";
 import type { OpcionesContexto } from "../../lib/datos.js";
 import type { components } from "./api.gen.js";
 import { exigirIT } from "../equipos/index.js";
-import { entregarEquipo, listarEstadoDeEquipos, solicitarEquipo } from "./prestamos.js";
+import { entregarEquipo, listarEstadoDeEquipos, prestarEquipo, solicitarEquipo } from "./prestamos.js";
 
 const ERRORES = {
   falta: "Falta la fecha de devolución",
@@ -36,5 +36,18 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     if (resultado === "no-reservado") return reply.code(409).send({ error: "El equipo no está reservado" });
     return reply.code(200).send(resultado);
   });
+
+  app.post<{ Params: { id: string }; Body: components["schemas"]["PrestamoMostrador"] | null }>(
+    "/api/equipos/:id/prestamo",
+    { preHandler: exigirIT },
+    async (request, reply) => {
+      const resultado = await prestarEquipo(almacen, request.params.id, request.body?.persona, request.body?.devolucion);
+      if (resultado === "falta") return reply.code(400).send({ error: "Faltan la persona o la fecha de devolución" });
+      if (resultado === "invalida") return reply.code(400).send({ error: "La fecha de devolución no es válida" });
+      if (resultado === "no-existe") return reply.code(404).send({ error: "No existe el equipo" });
+      if (resultado === "no-disponible") return reply.code(409).send({ error: "El equipo no está disponible" });
+      return reply.code(201).send(resultado);
+    },
+  );
   return Promise.resolve();
 };

@@ -78,6 +78,36 @@ export async function solicitarEquipo(
   return { id: equipo.id, nombre: equipo.nombre, estado: "reservado", persona, devolucion };
 }
 
+export type ResultadoPrestamo = EstadoEquipo | "falta" | "invalida" | "no-existe" | "no-disponible";
+
+/**
+ * Presta el equipo en el mostrador a la persona hasta la fecha de devolución, que puede ser anterior a hoy (IT apunta
+ * préstamos con retraso). El préstamo activo y su movimiento del historial se escriben en la misma transacción.
+ */
+export async function prestarEquipo(
+  almacen: Almacen,
+  equipoId: string,
+  persona: unknown,
+  devolucion: unknown,
+): Promise<ResultadoPrestamo> {
+  if (typeof persona !== "string" || persona.trim() === "") return "falta";
+  if (devolucion === undefined || devolucion === null || devolucion === "") return "falta";
+  if (typeof devolucion !== "string" || !esFechaValida(devolucion)) return "invalida";
+  const equipo = await obtenerEquipo(almacen, equipoId);
+  if (!equipo) return "no-existe";
+  const quien = persona.trim();
+  const prestado = await almacen.transaccion(async (tx) => {
+    if (await tx.obtener<PrestamoActivo>(ACTIVOS, equipoId)) return false;
+    const historialId = randomUUID();
+    const activo: PrestamoActivo = { equipoId, persona: quien, devolucion, estado: "prestado", historialId };
+    tx.guardar(ACTIVOS, equipoId, activo);
+    tx.guardar(HISTORIAL, historialId, { ...activo, entregadoEn: new Date().toISOString() });
+    return true;
+  });
+  if (!prestado) return "no-disponible";
+  return { id: equipo.id, nombre: equipo.nombre, estado: "prestado", persona: quien, devolucion };
+}
+
 export type ResultadoEntrega = EstadoEquipo | "no-existe" | "no-reservado";
 
 /**
