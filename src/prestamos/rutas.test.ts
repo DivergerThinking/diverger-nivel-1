@@ -219,6 +219,104 @@ describe("POST /api/equipos/{id}/entrega", () => {
   });
 });
 
+describe("POST /api/equipos/{id}/prestamo", () => {
+  const IT = "it@empresa.com";
+  const LUIS = "luis.gomez@empresa.com";
+  const prestar = (id: string, cuerpo: unknown, correo = IT) =>
+    app.inject({ method: "POST", url: `/api/equipos/${id}/prestamo`, headers: { "x-correo": correo }, payload: cuerpo as object });
+
+  it("presta un equipo disponible: 201 prestado con la persona y la devolución", async () => {
+    const id = await altaEquipo("Monitor 03");
+    const respuesta = await prestar(id, { persona: LUIS, devolucion: "2026-12-15" });
+    expect(respuesta.statusCode).toBe(201);
+    expect(respuesta.json()).toEqual({ id, nombre: "Monitor 03", estado: "prestado", persona: LUIS, devolucion: "2026-12-15" });
+    const lista = (await app.inject({ url: "/api/equipos", headers: { "x-correo": ANA } })).json<unknown[]>();
+    expect(lista).toEqual([{ id, nombre: "Monitor 03", estado: "prestado", persona: LUIS, devolucion: "2026-12-15" }]);
+  });
+
+  it("admite una fecha de devolución anterior a hoy", async () => {
+    const id = await altaEquipo("Monitor 03");
+    const respuesta = await prestar(id, { persona: LUIS, devolucion: "2000-01-01" });
+    expect(respuesta.statusCode).toBe(201);
+    expect(respuesta.json()).toMatchObject({ estado: "prestado", devolucion: "2000-01-01" });
+  });
+
+  it("deja un movimiento prestado en el historial", async () => {
+    const id = await altaEquipo("Monitor 03");
+    await prestar(id, { persona: LUIS, devolucion: FUTURA });
+    const historial = await almacen.listar<{ equipoId: string; persona: string; estado: string }>("historialPrestamos");
+    expect(historial).toMatchObject([{ equipoId: id, persona: LUIS, estado: "prestado" }]);
+  });
+
+  it("sin persona o sin fecha responde 400 «Faltan la persona o la fecha de devolución»", async () => {
+    const id = await altaEquipo("Monitor 03");
+    for (const cuerpo of [{ devolucion: "2026-12-15" }, { persona: LUIS }, {}, { persona: "  ", devolucion: "2026-12-15" }, { persona: LUIS, devolucion: "" }]) {
+      const respuesta = await prestar(id, cuerpo);
+      expect(respuesta.statusCode).toBe(400);
+      expect(respuesta.json()).toEqual({ error: "Faltan la persona o la fecha de devolución" });
+    }
+  });
+
+  it("una fecha que no existe responde 400 «La fecha de devolución no es válida»", async () => {
+    const id = await altaEquipo("Monitor 03");
+    for (const devolucion of ["2026-02-30", "mañana", 7]) {
+      const respuesta = await prestar(id, { persona: LUIS, devolucion });
+      expect(respuesta.statusCode).toBe(400);
+      expect(respuesta.json()).toEqual({ error: "La fecha de devolución no es válida" });
+    }
+  });
+
+  it("un equipo reservado responde 409 «El equipo no está disponible» y no cambia la reserva", async () => {
+    const id = await altaEquipo("Monitor 03");
+    await solicitar(id, { devolucion: FUTURA });
+    const respuesta = await prestar(id, { persona: LUIS, devolucion: "2026-12-15" });
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está disponible" });
+    const lista = (await app.inject({ url: "/api/equipos", headers: { "x-correo": ANA } })).json<unknown[]>();
+    expect(lista).toEqual([{ id, nombre: "Monitor 03", estado: "reservado", persona: ANA, devolucion: FUTURA }]);
+  });
+
+  it("un equipo ya prestado responde 409 «El equipo no está disponible»", async () => {
+    const id = await altaEquipo("Monitor 03");
+    await prestar(id, { persona: LUIS, devolucion: FUTURA });
+    const respuesta = await prestar(id, { persona: ANA, devolucion: FUTURA });
+    expect(respuesta.statusCode).toBe(409);
+    expect(respuesta.json()).toEqual({ error: "El equipo no está disponible" });
+  });
+
+  it("dos préstamos simultáneos: uno recibe 201 y el otro 409", async () => {
+    const id = await altaEquipo("Monitor 03");
+    const respuestas = await Promise.all([
+      prestar(id, { persona: LUIS, devolucion: FUTURA }),
+      prestar(id, { persona: "marta.ruiz@empresa.com", devolucion: FUTURA }),
+    ]);
+    expect(respuestas.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+    const perdedora = respuestas.find((r) => r.statusCode === 409);
+    expect(perdedora?.json()).toEqual({ error: "El equipo no está disponible" });
+  });
+
+  it("un equipo que no existe responde 404 «No existe el equipo»", async () => {
+    const respuesta = await prestar("no-existe", { persona: LUIS, devolucion: FUTURA });
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json()).toEqual({ error: "No existe el equipo" });
+  });
+
+  it("una cuenta que no es de IT responde 403 y no presta", async () => {
+    const id = await altaEquipo("Monitor 03");
+    const respuesta = await prestar(id, { persona: LUIS, devolucion: FUTURA }, ANA);
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json()).toEqual({ error: "Solo IT puede hacer esto." });
+    const lista = (await app.inject({ url: "/api/equipos", headers: { "x-correo": ANA } })).json<{ estado: string }[]>();
+    expect(lista[0]?.estado).toBe("disponible");
+  });
+
+  it("sin sesión responde 401", async () => {
+    const id = await altaEquipo("Monitor 03");
+    const respuesta = await app.inject({ method: "POST", url: `/api/equipos/${id}/prestamo`, payload: { persona: LUIS, devolucion: FUTURA } });
+    expect(respuesta.statusCode).toBe(401);
+  });
+});
+
 describe("fechas", () => {
   it("esFechaValida solo admite días que existen", () => {
     expect(esFechaValida("2028-02-29")).toBe(true);
