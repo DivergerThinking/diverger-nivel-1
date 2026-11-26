@@ -48,6 +48,21 @@ export async function listarEstadoDeEquipos(almacen: Almacen): Promise<EstadoEqu
   });
 }
 
+export type Vencido = components["schemas"]["Vencido"];
+
+/** Los préstamos vencidos (prestados con devolución anterior a hoy), del más antiguo al más reciente. */
+export async function listarVencidos(almacen: Almacen, hoy: string = hoyEnMadrid()): Promise<Vencido[]> {
+  const [equipos, activos] = await Promise.all([listarEquipos(almacen), almacen.listar<PrestamoActivo>(ACTIVOS)]);
+  const nombres = new Map(equipos.map((equipo) => [equipo.id, equipo.nombre]));
+  const vencidos: Vencido[] = [];
+  for (const activo of activos) {
+    const nombre = nombres.get(activo.equipoId);
+    if (nombre === undefined || activo.estado !== "prestado" || activo.devolucion >= hoy) continue;
+    vencidos.push({ id: activo.equipoId, nombre, persona: activo.persona, devolucion: activo.devolucion });
+  }
+  return vencidos.sort((a, b) => a.devolucion.localeCompare(b.devolucion) || a.nombre.localeCompare(b.nombre));
+}
+
 export type ResultadoSolicitud = EstadoEquipo | "falta" | "invalida" | "pasada" | "no-existe" | "no-disponible";
 
 /**
