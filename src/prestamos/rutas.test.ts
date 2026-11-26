@@ -67,6 +67,29 @@ describe("GET /api/equipos", () => {
     expect(respuesta.json()).toEqual({ error: "Inicia sesión con Google." });
   });
 
+  it("un equipo disponible va sin persona ni devolución y uno prestado las enseña", async () => {
+    const portatil = await altaEquipo("Portátil 07");
+    const proyector = await altaEquipo("Proyector 01");
+    await almacen.guardar("prestamosActivos", proyector, {
+      equipoId: proyector,
+      persona: "luis.gomez@empresa.com",
+      devolucion: "2026-12-10",
+      estado: "prestado",
+    });
+    const respuesta = await app.inject({ url: "/api/equipos", headers: { "x-correo": ANA } });
+    expect(respuesta.statusCode).toBe(200);
+    const lista = respuesta.json<Record<string, unknown>[]>();
+    expect(lista).toHaveLength(2);
+    expect(lista).toContainEqual({ id: portatil, nombre: "Portátil 07", estado: "disponible" });
+    expect(lista).toContainEqual({
+      id: proyector,
+      nombre: "Proyector 01",
+      estado: "prestado",
+      persona: "luis.gomez@empresa.com",
+      devolucion: "2026-12-10",
+    });
+  });
+
   it("un equipo reservado enseña la persona y la devolución", async () => {
     const id = await altaEquipo("Portátil 07");
     await solicitar(id, { devolucion: FUTURA });
