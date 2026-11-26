@@ -112,6 +112,45 @@ describe("préstamo en el mostrador", () => {
   });
 });
 
+describe("devolución en el mostrador", () => {
+  const PRESTADO = { id: "e-2", nombre: "Monitor 03", estado: "prestado", persona: "luis.gomez@empresa.com", devolucion: "2026-12-15" };
+
+  it("solo ofrece apuntar la devolución de los equipos prestados", async () => {
+    vi.stubGlobal("fetch", () => Promise.resolve(respuesta([RESERVADO, DISPONIBLE, PRESTADO])));
+    render(<Mostrador sesion={SESION} />);
+    expect(await screen.findByRole("button", { name: "Apuntar devolución de Monitor 03" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Apuntar devolución de Portátil 07" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: /Apuntar devolución/ })).toHaveLength(1);
+  });
+
+  it("apunta la devolución con el token de la sesión y recarga la lista", async () => {
+    const disponible = { id: "e-2", nombre: "Monitor 03", estado: "disponible" };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(respuesta([PRESTADO]))
+      .mockResolvedValueOnce(respuesta(disponible))
+      .mockResolvedValueOnce(respuesta([disponible]));
+    vi.stubGlobal("fetch", fetch);
+    render(<Mostrador sesion={SESION} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Apuntar devolución de Monitor 03" }));
+    expect(await screen.findByText("disponible")).toBeTruthy();
+    expect(fetch).toHaveBeenCalledWith("/api/equipos/e-2/devolucion", { method: "POST", headers: { authorization: "Bearer token-de-it" } });
+    expect(screen.queryByText("luis.gomez@empresa.com")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Apuntar devolución de Monitor 03" })).toBeNull();
+  });
+
+  it.each([
+    [409, "El equipo no está prestado"],
+    [404, "No existe el equipo"],
+  ])("enseña tal cual el error %i de la API: %s", async (status, mensaje) => {
+    const fetch = vi.fn().mockResolvedValueOnce(respuesta([PRESTADO])).mockResolvedValueOnce(respuesta({ error: mensaje }, status));
+    vi.stubGlobal("fetch", fetch);
+    render(<Mostrador sesion={SESION} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Apuntar devolución de Monitor 03" }));
+    expect((await screen.findByRole("alert")).textContent).toBe(mensaje);
+  });
+});
+
 describe("pantallas del contexto", () => {
   it("el mostrador es de IT: lo decide la ruta de vencidos", async () => {
     const mostrador = pantallas.find((p) => p.id === "prestamos-mostrador");

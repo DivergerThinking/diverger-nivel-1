@@ -108,7 +108,32 @@ export async function prestarEquipo(
   return { id: equipo.id, nombre: equipo.nombre, estado: "prestado", persona: quien, devolucion };
 }
 
-export type ResultadoEntrega = EstadoEquipo | "no-existe" | "no-reservado";
+export type ResultadoDevolucion = EstadoEquipo | "no-existe" | "no-prestado";
+
+/**
+ * Apunta la devolución del equipo prestado: el equipo vuelve a estar disponible. Se borra el préstamo activo y el
+ * movimiento del historial pasa a «devuelto» en la misma transacción.
+ */
+export async function devolverEquipo(almacen: Almacen, equipoId: string): Promise<ResultadoDevolucion> {
+  const equipo = await obtenerEquipo(almacen, equipoId);
+  if (!equipo) return "no-existe";
+  const devuelto = await almacen.transaccion(async (tx) => {
+    const activo = await tx.obtener<PrestamoActivo>(ACTIVOS, equipoId);
+    if (activo?.estado !== "prestado") return false;
+    const movimiento = activo.historialId ? await tx.obtener<MovimientoHistorial>(HISTORIAL, activo.historialId) : undefined;
+    tx.borrar(ACTIVOS, equipoId);
+    tx.guardar(HISTORIAL, activo.historialId ?? randomUUID(), {
+      ...(movimiento ?? activo),
+      estado: "devuelto",
+      devueltoEn: new Date().toISOString(),
+    });
+    return true;
+  });
+  if (!devuelto) return "no-prestado";
+  return { id: equipo.id, nombre: equipo.nombre, estado: "disponible" };
+}
+
+export type ResultadoEntrega =EstadoEquipo | "no-existe" | "no-reservado";
 
 /**
  * Entrega el equipo reservado: pasa a prestado con la misma persona y fecha de devolución. El préstamo activo y su
