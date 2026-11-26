@@ -14,6 +14,13 @@ interface PrestamoActivo {
   persona: string;
   devolucion: string;
   estado: "reservado" | "prestado";
+  /** El documento de historialPrestamos de este préstamo, para actualizar su estado. */
+  historialId?: string;
+}
+
+interface MovimientoHistorial extends PrestamoActivo {
+  reservadoEn?: string;
+  entregadoEn?: string;
 }
 
 /** El día de hoy en Madrid, como AAAA-MM-DD. */
@@ -61,11 +68,38 @@ export async function solicitarEquipo(
   if (!equipo) return "no-existe";
   const reservado = await almacen.transaccion(async (tx) => {
     if (await tx.obtener<PrestamoActivo>(ACTIVOS, equipoId)) return false;
-    const activo: PrestamoActivo = { equipoId, persona, devolucion, estado: "reservado" };
+    const historialId = randomUUID();
+    const activo: PrestamoActivo = { equipoId, persona, devolucion, estado: "reservado", historialId };
     tx.guardar(ACTIVOS, equipoId, activo);
-    tx.guardar(HISTORIAL, randomUUID(), { ...activo, reservadoEn: new Date().toISOString() });
+    tx.guardar(HISTORIAL, historialId, { ...activo, reservadoEn: new Date().toISOString() });
     return true;
   });
   if (!reservado) return "no-disponible";
   return { id: equipo.id, nombre: equipo.nombre, estado: "reservado", persona, devolucion };
+}
+
+export type ResultadoEntrega = EstadoEquipo | "no-existe" | "no-reservado";
+
+/**
+ * Entrega el equipo reservado: pasa a prestado con la misma persona y fecha de devolución. El préstamo activo y su
+ * movimiento del historial cambian en la misma transacción.
+ */
+export async function entregarEquipo(almacen: Almacen, equipoId: string): Promise<ResultadoEntrega> {
+  const equipo = await obtenerEquipo(almacen, equipoId);
+  if (!equipo) return "no-existe";
+  const entregado = await almacen.transaccion(async (tx) => {
+    const activo = await tx.obtener<PrestamoActivo>(ACTIVOS, equipoId);
+    if (activo?.estado !== "reservado") return undefined;
+    const movimiento = activo.historialId ? await tx.obtener<MovimientoHistorial>(HISTORIAL, activo.historialId) : undefined;
+    const prestado: PrestamoActivo = { ...activo, estado: "prestado" };
+    tx.guardar(ACTIVOS, equipoId, prestado);
+    tx.guardar(HISTORIAL, activo.historialId ?? randomUUID(), {
+      ...(movimiento ?? activo),
+      estado: "prestado",
+      entregadoEn: new Date().toISOString(),
+    });
+    return prestado;
+  });
+  if (!entregado) return "no-reservado";
+  return { id: equipo.id, nombre: equipo.nombre, estado: "prestado", persona: entregado.persona, devolucion: entregado.devolucion };
 }
