@@ -67,6 +67,34 @@ describe("POST /api/equipos", () => {
     }
     expect(await listarEquipos(almacen)).toEqual([]);
   });
+
+  it("un nombre igual salvo mayúsculas o espacios recibe 409 «Ya hay un equipo con ese nombre»", async () => {
+    process.env["CORREOS_IT"] = "it@empresa.com";
+    expect((await alta("it@empresa.com", { nombre: "Portátil 07" })).statusCode).toBe(201);
+    for (const nombre of [" portátil 07 ", "PORTÁTIL 07", "Portátil 07"]) {
+      const respuesta = await alta("it@empresa.com", { nombre });
+      expect(respuesta.statusCode).toBe(409);
+      expect(respuesta.json()).toEqual({ error: "Ya hay un equipo con ese nombre" });
+    }
+    expect(await listarEquipos(almacen)).toHaveLength(1);
+  });
+
+  it("un nombre distinto sí se da de alta", async () => {
+    process.env["CORREOS_IT"] = "it@empresa.com";
+    await alta("it@empresa.com", { nombre: "Portátil 07" });
+    expect((await alta("it@empresa.com", { nombre: "Portátil 08" })).statusCode).toBe(201);
+    expect(await listarEquipos(almacen)).toHaveLength(2);
+  });
+
+  it("dos altas simultáneas del mismo nombre: una recibe 201 y la otra 409", async () => {
+    process.env["CORREOS_IT"] = "it@empresa.com";
+    const respuestas = await Promise.all([
+      alta("it@empresa.com", { nombre: "Monitor 03" }),
+      alta("it@empresa.com", { nombre: " monitor 03" }),
+    ]);
+    expect(respuestas.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+    expect(await listarEquipos(almacen)).toHaveLength(1);
+  });
 });
 
 describe("exigirIT en otras rutas", () => {

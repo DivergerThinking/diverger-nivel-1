@@ -16,7 +16,8 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     async (request, reply) => {
       const nombre: unknown = request.body?.nombre;
       const equipo = await crearEquipo(almacen, typeof nombre === "string" ? nombre : "");
-      if (!equipo) return reply.code(400).send({ error: "Falta el nombre del equipo" });
+      if (equipo === "vacio") return reply.code(400).send({ error: "Falta el nombre del equipo" });
+      if (equipo === "repetido") return reply.code(409).send({ error: "Ya hay un equipo con ese nombre" });
       return reply.code(201).send(equipo);
     },
   );
