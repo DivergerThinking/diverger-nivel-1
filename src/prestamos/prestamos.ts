@@ -63,6 +63,18 @@ export async function listarVencidos(almacen: Almacen, hoy: string = hoyEnMadrid
   return vencidos.sort((a, b) => a.devolucion.localeCompare(b.devolucion) || a.nombre.localeCompare(b.nombre));
 }
 
+export type Movimiento = components["schemas"]["MovimientoHistorial"];
+
+/** Los préstamos del equipo, del más reciente al más antiguo; «no-existe» si el equipo no existe. */
+export async function obtenerHistorial(almacen: Almacen, equipoId: string): Promise<Movimiento[] | "no-existe"> {
+  if (!(await obtenerEquipo(almacen, equipoId))) return "no-existe";
+  const movimientos = (await almacen.listar<MovimientoHistorial>(HISTORIAL)).filter((m) => m.equipoId === equipoId);
+  const inicio = (m: MovimientoHistorial) => m.reservadoEn ?? m.entregadoEn ?? "";
+  return movimientos
+    .sort((a, b) => inicio(b).localeCompare(inicio(a)) || b.devolucion.localeCompare(a.devolucion))
+    .map(({ persona, devolucion, estado }) => ({ persona, devolucion, estado }));
+}
+
 export type ResultadoSolicitud = EstadoEquipo | "falta" | "invalida" | "pasada" | "no-existe" | "no-disponible";
 
 /**
