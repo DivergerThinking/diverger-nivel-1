@@ -3,7 +3,7 @@ import type { FastifyPluginAsync } from "fastify";
 import type { OpcionesContexto } from "../../lib/datos.js";
 import type { components } from "./api.gen.js";
 import { exigirIT } from "../equipos/index.js";
-import { devolverEquipo, entregarEquipo, listarEstadoDeEquipos, listarVencidos, prestarEquipo, solicitarEquipo } from "./prestamos.js";
+import { devolverEquipo, entregarEquipo, listarEstadoDeEquipos, listarVencidos, obtenerHistorial, prestarEquipo, solicitarEquipo } from "./prestamos.js";
 
 const ERRORES = {
   falta: "Falta la fecha de devolución",
@@ -53,6 +53,12 @@ export const rutas: FastifyPluginAsync<OpcionesContexto> = (app, { almacen }) =>
     const resultado = await devolverEquipo(almacen, request.params.id);
     if (resultado === "no-existe") return reply.code(404).send({ error: "No existe el equipo" });
     if (resultado === "no-prestado") return reply.code(409).send({ error: "El equipo no está prestado" });
+    return reply.code(200).send(resultado);
+  });
+
+  app.get<{ Params: { id: string } }>("/api/equipos/:id/historial", { preHandler: exigirIT }, async (request, reply) => {
+    const resultado = await obtenerHistorial(almacen, request.params.id);
+    if (resultado === "no-existe") return reply.code(404).send({ error: "No existe el equipo" });
     return reply.code(200).send(resultado);
   });
 
